@@ -277,6 +277,128 @@
     text-align: right;
     opacity: 0.85;
 }
+        
+/* DESCRIPCIÓN DEL JUEGO */
+.game-description {
+    width: 900px;
+    margin: 18px auto 25px;
+    padding: 18px 24px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 2px solid rgba(76, 201, 240, 0.3);
+    border-left: 4px solid #4cc9f0;
+    border-radius: 12px;
+    text-align: center;
+}
+
+.game-description h2 {
+    color: #4cc9f0;
+    font-size: 1.5rem;
+    margin-bottom: 10px;
+}
+
+.game-description p {
+    color: #ddd;
+    font-size: 1rem;
+    line-height: 1.7;
+}
+
+/* SECCIÓN DE PERSONAJES */
+.characters-section {
+    width: 900px;
+    margin: 25px auto;
+    padding: 22px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 2px solid rgba(76, 201, 240, 0.3);
+    border-radius: 15px;
+}
+
+.characters-section h2 {
+    color: #4cc9f0;
+    text-align: center;
+    font-size: 1.8rem;
+    margin-bottom: 8px;
+}
+
+.characters-intro {
+    color: #ccc;
+    text-align: center;
+    margin-bottom: 20px;
+    line-height: 1.5;
+}
+
+.characters-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 15px;
+}
+
+.character-card {
+    min-width: 0;
+    padding: 12px;
+    background: rgba(15, 27, 47, 0.9);
+    border: 1px solid rgba(76, 201, 240, 0.4);
+    border-radius: 12px;
+    text-align: center;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.character-card:hover {
+    transform: translateY(-4px);
+    border-color: #4cc9f0;
+}
+
+.character-card img {
+    display: block;
+    width: 100%;
+    height: 145px;
+    object-fit: contain;
+    margin-bottom: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 8px;
+}
+
+.character-card h3 {
+    color: #4cc9f0;
+    font-size: 1rem;
+    margin-bottom: 8px;
+}
+
+.character-card p {
+    color: #ddd;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+/* ADAPTACIÓN A TABLET Y CELULAR */
+@media (max-width: 950px) {
+    .game-description,
+    .characters-section {
+        width: 95%;
+    }
+
+    .characters-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 500px) {
+    .characters-section {
+        padding: 14px;
+    }
+
+    .characters-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .character-card img {
+        height: 170px;
+    }
+
+    .game-description {
+        padding: 15px;
+    }
+}
+
 
     </style>
 </head>
@@ -306,6 +428,18 @@
             </div>
         </div>
     </div>
+    
+    <!-- DESCRIPCIÓN DEL JUEGO -->
+    <section class="game-description">
+        <h2>¿De qué trata La Horda?</h2>
+        <p>
+            Acompaña a Kevin en una aventura inspirada en la película
+            <em>Fragmentado</em>. Supera los desafíos de cada nivel,
+            descubre los obstáculos que te esperan y avanza hasta llegar
+            al final. ¿Podrás completar todos los niveles?
+        </p>
+    </section>
+
     
     <div id="gameWrapper" class="game-container">
 
@@ -388,6 +522,70 @@
     <h2 id="levelTitle">KEVIN HOUSE'S</h2>
 </div>
 </div>
+    
+ <div id="levelIntro">
+    <h2 id="levelTitle">KEVIN HOUSE'S</h2>
+ </div>
+</div>
+
+<!-- TARJETAS DE PERSONAJES -->
+<section class="characters-section">
+    <h2>PERSONAJES</h2>
+    <p class="characters-intro">
+        Conoce las personalidades que encontrarás a lo largo de los seis niveles.
+    </p>
+
+    <div class="characters-grid">
+
+        <article class="character-card">
+            <img src="img/level1/kevin_frente.png"
+                 alt="Kevin" loading="lazy">
+            <h3>KEVIN</h3>
+            <p>El protagonista de esta aventura, cuyo camino te llevará a enfrentar cada nivel.</p>
+        </article>
+
+        <article class="character-card">
+            <img src="img/level2/kevin_frente.png"
+                 alt="Dennis" loading="lazy">
+            <h3>DENNIS</h3>
+            <p>Una personalidad estricta y dominante que representa uno de los desafíos del recorrido.</p>
+        </article>
+
+        <article class="character-card">
+            <img src="img/level3/kevin_frente.png"
+                 alt="Patricia" loading="lazy">
+            <h3>PATRICIA</h3>
+            <p>Una personalidad firme y autoritaria dentro de la historia.</p>
+        </article>
+
+        <article class="character-card">
+            <img src="img/level4/kevin_frente.png"
+                 alt="Barry" loading="lazy">
+            <h3>BARRY</h3>
+            <p>Una personalidad creativa que forma parte de las distintas identidades de Kevin.</p>
+        </article>
+
+        <article class="character-card">
+            <img src="img/level5/kevin_frente.png"
+                 alt="Hedwig" loading="lazy">
+            <h3>HEDWIG</h3>
+            <p>Una personalidad infantil que aporta un contraste particular a la historia.</p>
+        </article>
+
+        <article class="character-card">
+            <img src="img/level6/kevin_frente.png"
+                 alt="La Bestia" loading="lazy">
+            <h3>LA BESTIA</h3>
+            <p>La personalidad más temida, que representa el desafío final de esta aventura.</p>
+        </article>
+
+    </div>
+</section>
+
+<div class="animation-info" style="display:none;">
+    Estado actual de Kevin: <span id="kevinState">CARGANDO...</span>
+</div>
+
     <div class="animation-info" style="display:none;">
     Estado actual de Kevin: <span id="kevinState">CARGANDO...</span>
  </div>
