@@ -1,0 +1,2499 @@
+const canvas = document.getElementById('gameCanvas');
+        const levelIntro = document.getElementById('levelIntro');
+        const levelTitle = document.getElementById('levelTitle');
+        const ctx = canvas.getContext('2d');
+        const kevinStateElement = document.getElementById('kevinState');
+
+        let level = 1;
+        const levelNames = {
+            1: "KEVIN",
+            2: "DENNIS",
+            3: "PATRICIA",
+            4: "BARRY",
+            5: "HEDWIG",
+            6: "LA BESTIA"
+        };
+        let lives = 3;
+        let gameRunning = true;
+        let keys = {};
+        let gameTime = 0;
+        let imagesLoaded = false;
+        let levelTransitioning = false;
+        let lastTime = 0;
+        let cameraY = 0;
+        let maxCameraY = 0;
+        let doodlesCache = null;
+        let gameOverButton = null;
+        let showFinalScreen = false;
+        let finalScreenStartTime = null;
+
+        const kevin = {
+            x: 100,
+            y: 470,
+            width: 60,
+            height: 80,
+            velocityX: 0,
+            velocityY: 0,
+            speed: 3,
+            jumpForce: 9.5,
+            isJumping: false,
+            isOnGround: true,
+            acceleration: 1.1,
+            friction: 0.6,
+            maxSpeed: 5.2,
+            walkAnimationTimer: 0,
+            walkAnimationSpeed: 0.12,
+            walkFrameTimer: 0,
+            walkFrameDuration: 0.18,
+            state: 'idle',
+            direction: 'right',
+            currentStepFrame: 0,
+            jumpAnimationTimer: 0,
+            isJumpingHorizontally: false,
+            images: {
+                idle: null,
+                walkRight1: null,
+                walkRight2: null,
+                walkLeft1: null,
+                walkLeft2: null,
+                jump: null,
+                jumpRight: null,
+                jumpLeft: null
+            }
+        };
+        const palette = {
+            darkBrown: '#2b1f14',
+            agedBeige: '#c8b89a',
+            olive: '#5e6b4f',
+            dirtyGold: 'rgba(210,180,90,0.15)',
+            shadow: 'rgba(0,0,0,0.35)'
+        };
+        const mirrorWallPalette = {
+            frame: '#c9a86a',
+            frameDark: '#9f7f45',
+            glassBase: '#dfe7ea',
+            glassLight: 'rgba(255,255,255,0.25)',
+            glassShadow: 'rgba(180,180,180,0.15)'
+        };
+
+        let platforms = [];
+        let memories = [];
+        let closingWalls = [];
+        let levelTimer = 0;
+        let lastLifeTick = 0;
+        const LEVEL_TIME_LIMIT = 60;
+        const LIFE_INTERVAL = 20;
+        let punishZones = [];
+        let darknessLevel = 0;
+
+        function calculateCameraLimit() {
+            let highestPlatformY = Infinity;
+            platforms.forEach(p => {
+                if (p.y < highestPlatformY) {
+                    highestPlatformY = p.y;
+                }
+            });
+            maxCameraY = highestPlatformY - 100;
+        }
+
+        function loadKevinImages() {
+            imagesLoaded = false;
+            const basePath = `img/level${level}/`;
+
+            const imagePaths = {
+                idle: basePath + 'kevin_frente.png',
+                walkRight1: basePath + 'kevin_derecha1.png',
+                walkRight2: basePath + 'kevin_derecha2.png',
+                walkLeft1: basePath + 'kevin_izquierda1.png',
+                walkLeft2: basePath + 'kevin_izquierda2.png',
+                jump: basePath + 'kevin_saltar.png',
+                jumpRight: basePath + 'kevin_saltar_derecha.png',
+                jumpLeft: basePath + 'kevin_saltar_izquierda.png'
+            };
+
+            let loadedCount = 0;
+            const totalImages = Object.keys(imagePaths).length;
+
+            Object.keys(imagePaths).forEach(key => {
+                kevin.images[key] = new Image();
+                kevin.images[key].onload = () => {
+                    loadedCount++;
+                    if (loadedCount === totalImages) {
+                        imagesLoaded = true;
+                    }
+                };
+                kevin.images[key].onerror = () => {
+                    createFallbackImage(key);
+                    loadedCount++;
+                };
+                kevin.images[key].src = imagePaths[key];
+            });
+        }
+
+        function createFallbackImage(state) {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = 100;
+            tempCanvas.height = 100;
+            const tempCtx = tempCanvas.getContext('2d');
+
+            let color, text;
+            switch(state) {
+                case 'idle': color = '#f72585'; text = 'FRENTE'; break;
+                case 'walkRight1': color = '#4361ee'; text = 'DER1'; break;
+                case 'walkRight2': color = '#4361ee'; text = 'DER2'; break;
+                case 'walkLeft1': color = '#7209b7'; text = 'IZQ1'; break;
+                case 'walkLeft2': color = '#7209b7'; text = 'IZQ2'; break;
+                case 'jump': color = '#f8961e'; text = 'SALTO'; break;
+                case 'jumpRight': color = '#4cc9f0'; text = 'SALTO DER'; break;
+                case 'jumpLeft': color = '#7209b7'; text = 'SALTO IZQ'; break;
+                default: color = '#f72585'; text = state;
+            }
+
+            tempCtx.fillStyle = color;
+            tempCtx.beginPath();
+            tempCtx.arc(50, 30, 20, 0, Math.PI * 2);
+            tempCtx.fill();
+            tempCtx.fillRect(35, 50, 30, 40);
+
+            if (state.includes('walkRight1') || state.includes('walkLeft2')) {
+                tempCtx.fillRect(65, 55, 20, 10);
+                tempCtx.fillRect(15, 50, 20, 15);
+            } else if (state.includes('walkRight2') || state.includes('walkLeft1')) {
+                tempCtx.fillRect(65, 50, 20, 15);
+                tempCtx.fillRect(15, 55, 20, 10);
+            } else if (state.includes('jump')) {
+                tempCtx.fillRect(25, 40, 15, 30);
+                tempCtx.fillRect(60, 40, 15, 30);
+            } else {
+                tempCtx.fillRect(15, 55, 20, 10);
+                tempCtx.fillRect(65, 55, 20, 10);
+            }
+
+            if (state.includes('walkRight1') || state.includes('walkLeft1')) {
+                tempCtx.fillRect(40, 90, 10, 20);
+                tempCtx.fillRect(50, 93, 10, 22);
+            } else if (state.includes('walkRight2') || state.includes('walkLeft2')) {
+                tempCtx.fillRect(40, 93, 10, 22);
+                tempCtx.fillRect(50, 90, 10, 20);
+            } else if (state.includes('jump')) {
+                tempCtx.fillRect(40, 90, 10, 15);
+                tempCtx.fillRect(50, 90, 10, 15);
+            } else {
+                tempCtx.fillRect(40, 90, 10, 20);
+                tempCtx.fillRect(50, 90, 10, 20);
+            }
+
+            tempCtx.fillStyle = 'white';
+            tempCtx.font = 'bold 10px Arial';
+            tempCtx.textAlign = 'center';
+            tempCtx.fillText(text, 50, 25);
+
+            kevin.images[state] = new Image();
+            kevin.images[state].src = tempCanvas.toDataURL();
+        }
+
+        function init() {
+            loadKevinImages();
+            loadLevel(level);
+            updateUI();
+
+            window.addEventListener('keydown', function(e) {
+                if ([' ', 'w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(e.key.toLowerCase())) {
+                    e.preventDefault();
+                }
+                keys[e.key.toLowerCase()] = true;
+            });
+
+            window.addEventListener('keyup', function(e) {
+                keys[e.key.toLowerCase()] = false;
+            });
+
+            window.addEventListener('blur', function() {
+                keys = {};
+            });
+        }
+
+        function updateUI() {
+            document.getElementById('hudLevel').textContent = level;
+            const timeLeft = Math.max(0, LEVEL_TIME_LIMIT - levelTimer);
+            const totalSeconds = Math.ceil(timeLeft);
+            const m = Math.floor(totalSeconds / 60);
+            const s = totalSeconds % 60;
+            document.getElementById('hudScore').textContent =
+                `${m}:${s.toString().padStart(2,'0')}`;
+            document.getElementById('hudLives').textContent = lives;
+        }
+
+        function drawKevin() {
+            if (!imagesLoaded) return;
+
+            let imageToDraw;
+            let animationInfo = "";
+
+            switch(kevin.state) {
+                case 'idle':
+                    imageToDraw = kevin.images.idle;
+                    animationInfo = "IDLE (Mirando al frente)";
+                    kevinStateElement.style.color = '#f72585';
+                    break;
+
+                case 'walkRight':
+                    kevin.walkFrameTimer += 0.018;
+                    if (kevin.walkFrameTimer >= kevin.walkFrameDuration) {
+                        kevin.walkFrameTimer = 0;
+                        kevin.currentStepFrame =
+                            kevin.currentStepFrame === 0 ? 1 : 0;
+                    }
+                    imageToDraw = kevin.currentStepFrame === 0
+                        ? kevin.images.walkRight1
+                        : kevin.images.walkRight2;
+                    animationInfo = 'WALK RIGHT';
+                    kevinStateElement.style.color = '#4361ee';
+                    break;
+
+                case 'walkLeft':
+                    kevin.walkFrameTimer += 0.018;
+                    if (kevin.walkFrameTimer >= kevin.walkFrameDuration) {
+                        kevin.walkFrameTimer = 0;
+                        kevin.currentStepFrame =
+                            kevin.currentStepFrame === 0 ? 1 : 0;
+                    }
+                    imageToDraw = kevin.currentStepFrame === 0
+                        ? kevin.images.walkLeft1
+                        : kevin.images.walkLeft2;
+                    animationInfo = 'WALK LEFT';
+                    kevinStateElement.style.color = '#7209b7';
+                    break;
+
+                case 'jump':
+                    if (!kevin.isJumpingHorizontally) {
+                        imageToDraw = kevin.images.jump;
+                        animationInfo = "JUMP (En el sitio)";
+                    } else if (kevin.direction === 'right') {
+                        imageToDraw = kevin.images.jumpRight;
+                        animationInfo = "JUMP (Hacia derecha)";
+                    } else {
+                        imageToDraw = kevin.images.jumpLeft;
+                        animationInfo = "JUMP (Hacia izquierda)";
+                    }
+                    if (kevin.velocityY < -1) animationInfo += " ▲";
+                    else if (kevin.velocityY > 2) animationInfo += " ▼";
+                    kevinStateElement.style.color = '#f8961e';
+                    break;
+            }
+
+            kevinStateElement.textContent = animationInfo;
+
+            if (imageToDraw && imageToDraw.complete) {
+                const drawX = kevin.x;
+                const drawY = kevin.y - cameraY;
+
+                if (kevin.state === 'jump') {
+                    ctx.drawImage(
+                        imageToDraw,
+                        drawX,
+                        drawY,
+                        kevin.width,
+                        kevin.height
+                    );
+                } else {
+                    const bounceY = drawY + (kevin.state.includes('walk') ? Math.sin(gameTime * 15) * 2 : 0);
+                    ctx.drawImage(imageToDraw, drawX, bounceY, kevin.width, kevin.height);
+                }
+            }
+        }
+
+        function drawPlatforms() {
+            platforms.forEach(platform => {
+                if (platform.logic && !platform.logicState) return;
+                const platformY = platform.y - cameraY;
+
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.fillRect(platform.x + 3, platformY + 3, platform.width, platform.height);
+
+                ctx.fillStyle = platform.color;
+                ctx.fillRect(platform.x, platformY, platform.width, platform.height);
+
+                ctx.strokeStyle = platform.isGoal ? '#ffd166' : '#1a1a2e';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(platform.x, platformY, platform.width, platform.height);
+
+                if (platform.visited) {
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                    ctx.fillRect(platform.x + 5, platformY + 5, platform.width - 10, 5);
+                }
+
+                if (platform.isGoal) {
+                    ctx.fillStyle = '#ffd166';
+                    ctx.font = 'bold 14px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('META', platform.x + platform.width / 2, platformY - 10);
+
+                    ctx.fillStyle = '#8B4513';
+                    ctx.fillRect(platform.x + platform.width/2 - 15, platformY - 50, 30, 50);
+                    ctx.fillStyle = '#654321';
+                    ctx.fillRect(platform.x + platform.width/2 - 13, platformY - 48, 26, 46);
+                    ctx.fillStyle = '#D4A017';
+                    ctx.beginPath();
+                    ctx.arc(platform.x + platform.width/2 + 8, platformY - 25, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                if (platform.impure) {
+                    ctx.fillStyle = 'rgba(120, 0, 0, 0.35)';
+                    ctx.fillRect(platform.x, platformY, platform.width, platform.height);
+                }
+            });
+        }
+
+        function loadLevel(level) {
+
+            platforms = [];
+            levelTimer = 0;
+            lastLifeTick = 0;
+            memories = [];
+            closingWalls = [];
+            lives = 3;
+            levelTimer = 0;
+            lastLifeTick = 0;
+            updateUI();
+
+            initMemoriesForLevel(level);
+            initClosingWallsForLevel(level);
+            initPunishZonesForLevel(level);
+
+            if (level === 1) {
+                platforms = [
+
+                    { x: 0, y: 550 - 30, width: canvas.width, height: 30, color: '#555555', visited: true },
+
+                    { x: 300, y: 440, width: 130, height: 18, color: '#555555', visited: false },
+                    { x: 500, y: 370, width: 120, height: 18, color: '#555555', visited: false },
+                    { x: 135, y: 360, width: 120, height: 18, color: '#555555', visited: false },
+                    { x: 700, y: 310, width: 130, height: 18, color: '#555555', visited: false },
+                    { x: 5, y: 270, width: 100, height: 18, color: '#555555', visited: false },
+                    { x: 350, y: 290, width: 90, height: 18, color: '#555555', visited: false },
+                    { x: 600, y: 180, width: 130, height: 18, color: '#555555', visited: false },
+                    { x: 180, y: 200, width: 120, height: 18, color: '#555555', visited: false },
+                    { x: 790, y: 210, width: 100, height: 18, color: '#555555', visited: false },
+                    { x: 400, y: 170, width: 120, height: 18, color: '#555555', visited: false },
+                    { x: 30, y: 115, width: 120, height: 18, color: '#555555', visited: false },
+                    { x: 800, y: 80, width: 120, height: 18, color: '#555555', visited: false },
+                    { x: 600, y: 40, width: 120, height: 18, color: '#555555', visited: false },
+                    { x: 370, y: 15, width: 120, height: 18, color: '#555555', visited: false },
+                    { x: 0, y: -10, width: 90, height: 18, color: '#555555', visited: false },
+                    { x: 200, y: 45, width: 90, height: 18, color: '#555555', visited: false },
+                    { x: 200, y: -90, width: 120, height: 18, color: '#555555', visited: false },
+                    { x: 760, y: -50, width: 110, height: 18, color: '#555555', visited: false },
+                    { x: 560, y: -100, width: 120, height: 18, color: '#555555', visited: false },
+                    { x: 380, y: -170, width: 120, height: 18, color: '#555555', visited: false },
+                    { x: 0, y: -140, width: 110, height: 18, color: '#555555', visited: false },
+                    { x: 100, y: -230, width: 110, height: 18, color: '#555555', visited: false },
+                    { x: 300, y: -270, width: 100, height: 18, color: '#555555', visited: false },
+                    { x: 555, y: -270, width: 120, height: 18, color: '#555555', visited: false },
+                    { x: 730, y: -190, width: 110, height: 18, color: '#555555', visited: false },
+
+                    { x: 810, y: -300, width: 90, height: 18, color: '#f72585', visited: false, isGoal: true }
+                ];
+            }
+
+            if (level === 2) {
+                platforms = [
+
+                    { x: 0, y: 550 - 30, width: canvas.width, height: 30, color: '#3a3a3a', visited: true },
+
+                    { x: 150, y: 450, width: 90, height: 18, color: '#3a3a3a', visited: false },
+                    { x: 250, y: 380, width: 90, height: 18, color: '#3a3a3a', visited: false },
+                    { x: 350, y: 310, width: 90, height: 18, color: '#3a3a3a', visited: false },
+                    { x: 450, y: 310, width: 90, height: 18, color: '#3a3a3a', visited: false },
+                    { x: 550, y: 380, width: 90, height: 18, color: '#3a3a3a', visited: false },
+                    { x: 650, y: 450, width: 90, height: 18, color: '#3a3a3a', visited: false },
+                    { x: 200, y: 240, width: 90, height: 18, color: '#3a3a3a', visited: false },
+                    { x: 100, y: 170, width: 90, height: 18, color: '#3a3a3a', visited: false },
+                    { x: 600, y: 240, width: 90, height: 18, color: '#3a3a3a', visited: false },
+                    { x: 700, y: 170, width: 90, height: 18, color: '#3a3a3a', visited: false },
+                    { x: 0, y: 100, width: 90, height: 18, color: '#3a3a3a', visited: false },
+                    { x: 800, y: 100, width: 90, height: 18, color: '#3a3a3a', visited: false },
+                    { x: 400, y: 200, width: 90, height: 18, color: '#3a3a3a', visited: false },
+                    { x: 270, y: 110, width: 90, height: 18, color: '#3a3a3a', visited: false },
+                    { x: 530, y: 110, width: 90, height: 18, color: '#3a3a3a', visited: false },
+                    { x: 120, y: 30, width: 90, height: 18, color: '#3a3a3a', visited: false },
+                    { x: 680, y: 30, width: 90, height: 18, color: '#3a3a3a', visited: false },
+                    { x: 500, y: -20, width: 90, height: 18, color: '#3a3a3a', visited: false },
+                    { x: 310, y: -20, width: 90, height: 18, color: '#3a3a3a', visited: false },
+                    { x: 0, y: -50, width: 90, height: 18, color: '#3a3a3a', visited: false },
+                    { x: 800, y: -50, width: 90, height: 18, color: '#3a3a3a', visited: false },
+                    { x: 650, y: -100, width: 90, height: 18, color: '#3a3a3a', visited: false },
+                    { x: 510, y: -140, width: 90, height: 18, color: '#3a3a3a', visited: false },
+                    { x: 400, y: -190, width: 90, height: 18, color: '#3a3a3a', visited: false },
+                    { x: 150, y: -100, width: 90, height: 18, color: '#3a3a3a', visited: false },
+                    { x: 290, y: -140, width: 90, height: 18, color: '#3a3a3a', visited: false },
+                    { x: 590, y: -260, width: 90, height: 18, color: '#3a3a3a', visited: false },
+                    { x: 220, y: -260, width: 90, height: 18, color: '#3a3a3a', visited: false },
+
+                    { x: 400, y: -320, width: 90, height: 18, color: '#ffd166', visited: false, isGoal: true }
+                ];
+            }
+
+            if (level === 3) {
+                platforms = [
+
+                    { x: 0, y: 550 - 30, width: canvas.width, height: 30, color: '#D1B38E', visited: true },
+
+                    { x: 400, y: 450, width: 110, height: 18, color: '#D1B38E', visited: false },
+                    { x: 400, y: 380, width: 110, height: 18, color: '#D1B38E', visited: false },
+                    { x: 280, y: 310, width: 110, height: 18, color: '#D1B38E', visited: false },
+                    { x: 520, y: 310, width: 110, height: 18, color: '#D1B38E', visited: false },
+                    { x: 400, y: 240, width: 110, height: 18, color: '#D1B38E', visited: false },
+                    { x: 400, y: 170, width: 110, height: 18, color: '#D1B38E', visited: false },
+                    { x: 230, y: 100, width: 110, height: 18, color: '#D1B38E', visited: false },
+                    { x: 570, y: 100, width: 110, height: 18, color: '#D1B38E', visited: false },
+                    { x: 180, y: 30, width: 110, height: 18, color: '#D1B38E', visited: false },
+                    { x: 620, y: 30, width: 110, height: 18, color: '#D1B38E', visited: false },
+                    { x: 110, y: -40, width: 110, height: 18, color: '#D1B38E', visited: false },
+                    { x: 690, y: -40, width: 110, height: 18, color: '#D1B38E', visited: false },
+                    { x: 180, y: -110, width: 110, height: 18, color: '#D1B38E', visited: false },
+                    { x: 620, y: -110, width: 110, height: 18, color: '#D1B38E', visited: false },
+                    { x: 520, y: -40, width: 110, height: 18, color: '#D1B38E', visited: false },
+                    { x: 280, y: -40, width: 110, height: 18, color: '#D1B38E', visited: false },
+                    { x: 400, y: -90, width: 110, height: 18, color: '#D1B38E', visited: false },
+                    { x: 400, y: -160, width: 110, height: 18, color: '#D1B38E', visited: false },
+                    { x: 400, y: -220, width: 110, height: 18, color: '#D1B38E', visited: false },
+                    { x: 560, y: -260, width: 110, height: 18, color: '#D1B38E', visited: false },
+
+                    { x: 730, y: -300, width: 120, height: 18, color: '#ffd166', visited: false, isGoal: true }
+                ];
+            }
+
+            if (level === 4) {
+                platforms = [
+
+                    { x: 0, y: 550 - 30, width: canvas.width, height: 30, color: '#4D4E94', visited: true },
+
+                    { x: 250, y: 450, width: 110, height: 18, color: '#4D4E94', visited: false },
+                    { x: 350, y: 400, width: 110, height: 18, color: '#4D4E94', visited: false },
+                    { x: 450, y: 350, width: 110, height: 18, color: '#4D4E94', visited: false,
+                        logic: true, logicTimer: 0, logicInterval: 140, logicState: true },
+                    { x: 550, y: 300, width: 110, height: 18, color: '#4D4E94', visited: false },
+                    { x: 650, y: 250, width: 110, height: 18, color: '#4D4E94', visited: false },
+                    { x: 750, y: 180, width: 110, height: 18, color: '#4D4E94', visited: false,
+                        logic: true, logicTimer: 0, logicInterval: 180, logicState: true},
+                    { x: 550, y: 180, width: 110, height: 18, color: '#4D4E94', visited: false },
+                    { x: 50, y: 180, width: 110, height: 18, color: '#4D4E94', visited: false },
+                    { x: 250, y: 180, width: 110, height: 18, color: '#4D4E94', visited: false },
+                    { x: 160, y: 270, width: 110, height: 18, color: '#4D4E94', visited: false,
+                        logic: true, logicTimer: 0, logicInterval: 220, logicState: true },
+                    { x: 230, y: 330, width: 110, height: 18, color: '#4D4E94', visited: false },
+                    { x: 650, y: 100, width: 110, height: 18, color: '#4D4E94', visited: false },
+                    { x: 160, y: 100, width: 110, height: 18, color: '#4D4E94', visited: false,
+                        logic: true, logicTimer: 0, logicInterval: 140, logicState: true },
+                    { x: 180, y: 30, width: 110, height: 18, color: '#4D4E94', visited: false,
+                        logic: true, logicTimer: 0, logicInterval: 140, logicState: true },
+                    { x: 620, y: 30, width: 110, height: 18, color: '#4D4E94', visited: false },
+                    { x: 110, y: -40, width: 110, height: 18, color: '#4D4E94', visited: false },
+                    { x: 690, y: -40, width: 110, height: 18, color: '#4D4E94', visited: false,
+                        logic: true, logicTimer: 0, logicInterval: 180, logicState: true},
+                    { x: 180, y: -110, width: 110, height: 18, color: '#4D4E94', visited: false },
+                    { x: 620, y: -110, width: 110, height: 18, color: '#4D4E94', visited: false,
+                        logic: true, logicTimer: 0, logicInterval: 180, logicState: true},
+                    { x: 520, y: -40, width: 110, height: 18, color: '#4D4E94', visited: false,
+                        logic: true, logicTimer: 0, logicInterval: 220, logicState: true  },
+                    { x: 280, y: -40, width: 110, height: 18, color: '#4D4E94', visited: false },
+                    { x: 400, y: -160, width: 110, height: 18, color: '#4D4E94', visited: false,
+                        logic: true, logicTimer: 0, logicInterval: 220, logicState: true  },
+                    { x: 400, y: -220, width: 110, height: 18, color: '#4D4E94', visited: false,
+                        logic: true, logicTimer: 0, logicInterval: 140, logicState: true  },
+                    { x: 560, y: -260, width: 110, height: 18, color: '#4D4E94', visited: false },
+
+                    { x: 730, y: -300, width: 120, height: 18, color: '#ffd166', visited: false, isGoal: true }
+                ];
+            }
+
+            if (level === 5) {
+                platforms = [
+
+                    { x: 0, y: 550 - 30, width: canvas.width, height: 30, color: '#FFFF59', visited: true },
+
+                    { x: 250, y: 450, width: 110, height: 18, color: '#FFFF59', visited: false },
+                    { x: 350, y: 430, width: 110, height: 18, color: '#FF0000', visited: false },
+                    { x: 450, y: 380, width: 110, height: 18, color: '#6130AB', visited: false },
+                    { x: 550, y: 360, width: 110, height: 18, color: '#83FF57', visited: false },
+                    { x: 690, y: 340, width: 110, height: 18, color: '#FFFF59', visited: false },
+                    { x: 750, y: 320, width: 110, height: 18, color: '#FF8026', visited: false },
+                    { x: 590, y: 240, width: 110, height: 18, color: '#FFFF59', visited: false },
+                    { x: 50, y: 300, width: 110, height: 18, color: '#4A8EFF', visited: false },
+                    { x: 150, y: 200, width: 110, height: 18, color: '#FF8026', visited: false },
+                    { x: 140, y: 320, width: 110, height: 18, color: '#83FF57', visited: false },
+                    { x: 220, y: 340, width: 110, height: 18, color: '#FFFF59', visited: false },
+                    { x: 650, y: 180, width: 110, height: 18, color: '#FF0000', visited: false },
+                    { x: 250, y: 180, width: 110, height: 18, color: '#6130AB', visited: false },
+                    { x: 50, y: 120, width: 110, height: 18, color: '#FFFF59', visited: false },
+                    { x: 720, y: 120, width: 110, height: 18, color: '#4A8EFF', visited: false },
+                    { x: 430, y: 200, width: 110, height: 18, color: '#FF0000', visited: false },
+                    { x: 0, y: 50, width: 110, height: 18, color: '#FF0000', visited: false },
+                    { x: 690, y: 40, width: 110, height: 18, color: '#83FF57', visited: false },
+                    { x: 530, y: 10, width: 110, height: 18, color: '#6130AB', visited: false },
+                    { x: 150, y: -20, width: 110, height: 18, color: '#FFFF59', visited: false },
+                    { x: 330, y: 50, width: 110, height: 18, color: '#FF8026', visited: false },
+                    { x: 110, y: -90, width: 110, height: 18, color: '#83FF57', visited: false },
+                    { x: 10, y: -110, width: 110, height: 18, color: '#4A8EFF', visited: false },
+                    { x: 650, y: -70, width: 110, height: 18, color: '#FFFF59', visited: false },
+                    { x: 750, y: -90, width: 110, height: 18, color: '#FF8026', visited: false },
+                    { x: 230, y: -160, width: 110, height: 18, color: '#6130AB', visited: false },
+                    { x: 400, y: -220, width: 110, height: 18, color: '#FF0000', visited: false },
+                    { x: 560, y: -260, width: 110, height: 18, color: '#4A8EFF', visited: false },
+                    { x: 400, y: -80, width: 110, height: 18, color: '#83FF57', visited: false },
+
+                    { x: 730, y: -300, width: 120, height: 18, color: '#ffd166', visited: false, isGoal: true }
+                ];
+            }
+
+            if (level === 6) {
+                platforms = [
+
+                    { x: 0, y: 550 - 30, width: canvas.width, height: 30, color: '#C72900', visited: true },
+
+                    { x: 250, y: 450, width: 110, height: 18, color: '#C72900', visited: false },
+                    { x: 350, y: 400, width: 110, height: 18, color: '#C72900', visited: false, panic: true, panicTimer: 0 },
+                    { x: 450, y: 350, width: 110, height: 18, color: '#C72900', visited: false },
+                    { x: 550, y: 300, width: 110, height: 18, color: '#C72900', visited: false, panic: true, panicTimer: 0 },
+                    { x: 650, y: 250, width: 110, height: 18, color: '#C72900', visited: false },
+                    { x: 750, y: 180, width: 110, height: 18, color: '#C72900', visited: false, panic: true, panicTimer: 0 },
+                    { x: 550, y: 180, width: 110, height: 18, color: '#C72900', visited: false },
+                    { x: 50, y: 180, width: 110, height: 18, color: '#C72900', visited: false },
+                    { x: 250, y: 180, width: 110, height: 18, color: '#C72900', visited: false },
+                    { x: 160, y: 270, width: 110, height: 18, color: '#C72900', visited: false, panic: true, panicTimer: 0 },
+                    { x: 230, y: 330, width: 110, height: 18, color: '#C72900', visited: false },
+                    { x: 650, y: 100, width: 110, height: 18, color: '#C72900', visited: false },
+                    { x: 160, y: 100, width: 110, height: 18, color: '#C72900', visited: false, panic: true, panicTimer: 0},
+                    { x: 180, y: 30, width: 110, height: 18, color: '#C72900', visited: false },
+                    { x: 620, y: 30, width: 110, height: 18, color: '#C72900', visited: false },
+                    { x: 110, y: -40, width: 110, height: 18, color: '#C72900', visited: false, panic: true, panicTimer: 0 },
+                    { x: 690, y: -40, width: 110, height: 18, color: '#C72900', visited: false },
+                    { x: 180, y: -110, width: 110, height: 18, color: '#C72900', visited: false },
+                    { x: 620, y: -110, width: 110, height: 18, color: '#C72900', visited: false },
+                    { x: 520, y: -40, width: 110, height: 18, color: '#C72900', visited: false, panic: true, panicTimer: 0 },
+                    { x: 280, y: -40, width: 110, height: 18, color: '#C72900', visited: false },
+                    { x: 400, y: -160, width: 110, height: 18, color: '#C72900', visited: false, panic: true, panicTimer: 0 },
+                    { x: 400, y: -220, width: 110, height: 18, color: '#C72900', visited: false },
+                    { x: 560, y: -260, width: 110, height: 18, color: '#C72900', visited: false },
+
+                    { x: 730, y: -300, width: 120, height: 18, color: '#ffd166', visited: false, isGoal: true }
+                ];
+            }
+            calculateCameraLimit();
+        }
+
+        function drawCorridors() {
+            ctx.fillStyle = '#d1d4d8';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'rgba(120,120,120,0.25)';
+
+            const corridorHeight = 120;
+            const spacing = 200;
+
+            for (let y = -cameraY % spacing - spacing; y < canvas.height; y += spacing) {
+                const offsetX = Math.sin((cameraY + y) * 0.002) * 30;
+
+                ctx.fillRect(
+                    100 + offsetX,
+                    y,
+                    canvas.width - 200,
+                    corridorHeight
+                );
+            }
+        }
+        function drawAbstractDoors() {
+            ctx.strokeStyle = 'rgba(80,80,80,0.3)';
+            ctx.lineWidth = 4;
+
+            for (let i = 0; i < 6; i++) {
+                const x = 150 + i * 120;
+                const y = (i * 300 - cameraY * 0.5) % 900;
+
+                ctx.strokeRect(x, y, 60, 100);
+            }
+        }
+        function drawBreathingLight() {
+            const pulse = (Math.sin(gameTime * 1.2) + 1) / 2;
+
+            ctx.fillStyle = `rgba(255,255,255,${0.08 + pulse * 0.1})`;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        function drawKevinShadow() {
+            ctx.save();
+            ctx.globalAlpha = 0.12;
+
+            const shadowOffsetX = Math.sin(gameTime * 0.8) * 20;
+            const shadowOffsetY = Math.cos(gameTime * 0.6) * 15;
+
+            ctx.fillStyle = 'black';
+            ctx.fillRect(
+                kevin.x + shadowOffsetX,
+                kevin.y - cameraY + shadowOffsetY,
+                kevin.width,
+                kevin.height
+            );
+
+            ctx.restore();
+        }
+
+        function drawGridBackground() {
+            ctx.fillStyle = '#1c1c1c';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+            ctx.lineWidth = 1;
+
+            const gridSize = 60;
+
+            for (let x = 0; x < canvas.width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+
+            for (let y = 0; y < canvas.height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+        }
+        function drawPanels() {
+            const panelHeight = 80;
+            const spacing = 120;
+
+            for (let y = -cameraY % spacing - spacing; y < canvas.height; y += spacing) {
+                ctx.fillStyle = 'rgba(60,60,60,0.35)';
+                ctx.fillRect(
+                    100,
+                    y,
+                    canvas.width - 200,
+                    panelHeight
+                );
+            }
+        }
+        function drawMovingLines() {
+            ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+            ctx.lineWidth = 2;
+
+            for (let i = 0; i < 6; i++) {
+                const y =
+                    (i * 150 + Math.sin(gameTime * 2 + i) * 20 - cameraY * 0.3) %
+                    canvas.height;
+
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+        }
+        function drawScannerLight() {
+            const scanY = (gameTime * 120) % canvas.height;
+
+            const gradient = ctx.createLinearGradient(0, scanY - 40, 0, scanY + 40);
+            gradient.addColorStop(0, 'rgba(0,255,255,0)');
+            gradient.addColorStop(0.5, 'rgba(0,255,255,0.15)');
+            gradient.addColorStop(1, 'rgba(0,255,255,0)');
+
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, scanY - 40, canvas.width, 80);
+        }
+
+        function drawFarLayer(time) {
+            ctx.fillStyle = palette.darkBrown;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = 'rgba(200,184,154,0.08)';
+            ctx.lineWidth = 2;
+
+            for (let x = 0; x < canvas.width; x += 60) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+
+            ctx.strokeStyle = 'rgba(200,184,154,0.05)';
+            for (let y = 0; y < canvas.height; y += 80) {
+                for (let x = 0; x < canvas.width; x += 120) {
+                    ctx.strokeRect(x + 20, y + 20, 80, 40);
+                }
+            }
+
+            for (let i = 0; i < 300; i++) {
+                ctx.fillStyle = 'rgba(0,0,0,0.03)';
+                ctx.fillRect(
+                    Math.random() * canvas.width,
+                    Math.random() * canvas.height,
+                    1, 1
+                );
+            }
+        }
+        function drawMidLayer(time) {
+
+            ctx.strokeStyle = 'rgba(200,184,154,0.4)';
+            for (let i = 0; i < 3; i++) {
+                ctx.strokeRect(
+                    80 + i * 240,
+                    260,
+                    180,
+                    90
+                );
+            }
+
+            for (let i = 0; i < 3; i++) {
+                const cx = 140 + i * 260;
+                const cy = 420;
+                ctx.beginPath();
+                ctx.arc(cx, cy, 22, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        }
+        function drawNearLayer() {
+
+            ctx.fillStyle = '#3a2a1a';
+            for (let i = 0; i < 5; i++) {
+                ctx.fillRect(40 + i * 160, canvas.height - 90, 120, 18);
+            }
+
+            ctx.fillStyle = '#4a3824';
+            for (let i = 0; i < 3; i++) {
+                ctx.fillRect(120 + i * 240, canvas.height - 150, 20, 60);
+            }
+
+        }
+        function drawDoctrineLight(time) {
+            const y = (time * 0.03) % canvas.height;
+
+            const grad = ctx.createLinearGradient(0, y, 0, y + 200);
+            grad.addColorStop(0, 'rgba(0,0,0,0)');
+            grad.addColorStop(0.5, palette.dirtyGold);
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, y - 200, canvas.width, 200);
+        }
+        const doctrineSymbols = ['I', 'V', 'X', '║', '═', '▢', '▣', '∎'];
+
+        function drawDoctrineSymbols(time) {
+            ctx.font = '14px monospace';
+            ctx.fillStyle = 'rgba(200,184,154,0.15)';
+
+            for (let i = 0; i < 12; i++) {
+                const alpha = (Math.sin(time * 0.001 + i) + 1) * 0.5;
+                ctx.globalAlpha = alpha;
+
+                ctx.fillText(
+                    doctrineSymbols[Math.floor(Math.random() * doctrineSymbols.length)],
+                    60 + i * 60,
+                    180 + (i % 3) * 40
+                );
+            }
+
+            ctx.globalAlpha = 1;
+        }
+        function drawMaternalCrosses(time) {
+            const crossColor = 'rgba(200,184,154,0.18)';
+            const glowColor  = 'rgba(210,180,90,0.08)';
+
+            const spacingX = 140;
+            const spacingY = 200;
+
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+
+            for (let y = 80; y < canvas.height; y += spacingY) {
+                for (let x = 70; x < canvas.width; x += spacingX) {
+
+                    const breath = Math.sin(time * 0.001 + x + y) * 2;
+
+                    const cx = x;
+                    const cy = y + breath;
+
+                    ctx.strokeStyle = glowColor;
+                    ctx.lineWidth = 6;
+                    ctx.beginPath();
+                    ctx.moveTo(cx, cy - 26);
+                    ctx.lineTo(cx, cy + 38);
+                    ctx.stroke();
+
+                    ctx.strokeStyle = crossColor;
+                    ctx.lineWidth = 2;
+
+                    ctx.beginPath();
+                    ctx.moveTo(cx, cy - 30);
+                    ctx.lineTo(cx, cy + 40);
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.moveTo(cx - 10, cy);
+                    ctx.lineTo(cx + 10, cy);
+                    ctx.stroke();
+                }
+            }
+        }
+
+        function drawArchedMirror(x, y, w, h, time, distort = false) {
+            const r = w / 2;
+
+            ctx.fillStyle = mirrorWallPalette.frame;
+            ctx.beginPath();
+            ctx.moveTo(x, y + h);
+            ctx.lineTo(x, y + r);
+            ctx.arc(x + r, y + r, r, Math.PI, 0);
+            ctx.lineTo(x + w, y + h);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = mirrorWallPalette.frameDark;
+            ctx.beginPath();
+            ctx.moveTo(x + 4, y + h - 4);
+            ctx.lineTo(x + 4, y + r);
+            ctx.arc(x + r, y + r, r - 4, Math.PI, 0);
+            ctx.lineTo(x + w - 4, y + h - 4);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(x + 8, y + h - 8);
+            ctx.lineTo(x + 8, y + r);
+            ctx.arc(x + r, y + r, r - 8, Math.PI, 0);
+            ctx.lineTo(x + w - 8, y + h - 8);
+            ctx.closePath();
+            ctx.clip();
+
+            ctx.fillStyle = mirrorWallPalette.glassBase;
+            ctx.fillRect(x, y, w, h);
+
+            ctx.strokeStyle = 'rgba(120,120,120,0.25)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([8, 12]);
+
+            for (let lx = x + 16; lx < x + w - 16; lx += 28) {
+                ctx.beginPath();
+                ctx.moveTo(lx, y);
+                ctx.lineTo(lx, y + h);
+                ctx.stroke();
+            }
+
+            for (let ly = y + 40; ly < y + h - 20; ly += 60) {
+                ctx.beginPath();
+                ctx.moveTo(x, ly);
+                ctx.lineTo(x + w, ly);
+                ctx.stroke();
+            }
+
+            ctx.setLineDash([]);
+
+            for (let i = -h; i < h * 2; i += 60) {
+                const wave = distort ? Math.sin(time * 0.002 + i * 0.1) * 6 : 0;
+
+                ctx.fillStyle = mirrorWallPalette.glassLight;
+                ctx.fillRect(
+                    x - w + i + wave,
+                    y + i * 0.4,
+                    w * 2,
+                    8
+                );
+
+                ctx.fillStyle = mirrorWallPalette.glassShadow;
+                ctx.fillRect(
+                    x - w + i + 12 + wave,
+                    y + i * 0.4 + 12,
+                    w * 2,
+                    6
+                );
+            }
+
+            ctx.restore();
+        }
+        function drawMirrorWallBackground(time) {
+            const mirrorW = 120;
+            const mirrorH = 200;
+            const gapX = 40;
+            const gapY = 30;
+
+            let row = 0;
+
+            for (let y = 40; y < canvas.height + mirrorH; y += mirrorH + gapY) {
+                for (let x = 40; x < canvas.width + mirrorW; x += mirrorW + gapX) {
+
+                    const distort =
+                        (row + Math.floor(x / mirrorW)) % 3 === 0;
+
+                    drawArchedMirror(
+                        x,
+                        y - cameraY * 0.15,
+                        mirrorW,
+                        mirrorH,
+                        time,
+                        distort
+                    );
+                }
+                row++;
+            }
+        }
+        function drawFashionPatternLayer(time) {
+            ctx.save();
+
+            ctx.strokeStyle = 'rgba(90,90,90,0.50)';
+            ctx.fillStyle = 'rgba(90,90,90,0.50)';
+            ctx.lineWidth = 1;
+
+            ctx.setLineDash([6, 10]);
+
+            for (let x = 60; x < canvas.width; x += 220) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+
+            for (let y = 80; y < canvas.height; y += 200) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+
+            ctx.setLineDash([]);
+
+            for (let x = 120; x < canvas.width; x += 320) {
+                for (let y = 100; y < canvas.height; y += 300) {
+
+                    ctx.beginPath();
+                    ctx.arc(
+                        x,
+                        y,
+                        60 + Math.sin(time * 0.001 + x) * 6,
+                        Math.PI * 1.1,
+                        Math.PI * 1.9
+                    );
+                    ctx.stroke();
+                }
+            }
+
+            for (let x = 100; x < canvas.width; x += 260) {
+                for (let y = 120; y < canvas.height; y += 260) {
+
+                    ctx.beginPath();
+                    ctx.moveTo(x - 10, y);
+                    ctx.lineTo(x + 10, y);
+                    ctx.moveTo(x, y - 10);
+                    ctx.lineTo(x, y + 10);
+                    ctx.stroke();
+                }
+            }
+
+            ctx.font = '10px monospace';
+            ctx.textAlign = 'center';
+
+            const labels = ['A', 'B', 'C', 'I', 'II'];
+
+            for (let i = 0; i < labels.length; i++) {
+                const x = 140 + i * 240;
+                const y = 60 + (i % 2) * 120;
+
+                ctx.fillText(labels[i], x, y);
+            }
+
+            ctx.restore();
+        }
+        function drawFashionMannequin(x, y, scale = 1, time = 0) {
+            ctx.save();
+            ctx.translate(x, y);
+
+            const breathe = Math.sin(time * 0.001 + x) * 2;
+
+            ctx.strokeStyle = 'rgba(85,85,85,0.45)';
+            ctx.lineWidth = 1;
+            ctx.fillStyle = 'rgba(85,85,85,0.08)';
+
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.bezierCurveTo(
+                -30 * scale, 20 * scale,
+                -40 * scale, 90 * scale,
+                -18 * scale, 150 * scale
+            );
+            ctx.bezierCurveTo(
+                0, 175 * scale,
+                18 * scale, 150 * scale,
+                40 * scale, 90 * scale
+            );
+            ctx.bezierCurveTo(
+                30 * scale, 20 * scale,
+                10 * scale, 5 * scale,
+                0, 0
+            );
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.setLineDash([4, 6]);
+            ctx.beginPath();
+            ctx.moveTo(0, 10 * scale);
+            ctx.lineTo(0, 145 * scale);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(-10 * scale, 30 * scale);
+            ctx.bezierCurveTo(
+                -22 * scale, 60 * scale,
+                -22 * scale, 110 * scale,
+                -8 * scale, 140 * scale
+            );
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(10 * scale, 30 * scale);
+            ctx.bezierCurveTo(
+                22 * scale, 60 * scale,
+                22 * scale, 110 * scale,
+                8 * scale, 140 * scale
+            );
+            ctx.stroke();
+
+            ctx.setLineDash([]);
+
+            ctx.beginPath();
+            ctx.moveTo(-6 * scale, -10 * scale);
+            ctx.lineTo(6 * scale, -10 * scale);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(0, 150 * scale + breathe);
+            ctx.lineTo(0, 195 * scale + breathe);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(-18 * scale, 200 * scale);
+            ctx.quadraticCurveTo(
+                0, 210 * scale,
+                18 * scale, 200 * scale
+            );
+            ctx.stroke();
+
+            ctx.restore();
+        }
+        function drawFashionMannequin(x, y, scale = 1, time = 0) {
+            ctx.save();
+            ctx.translate(x, y);
+
+            ctx.strokeStyle = 'rgba(90,90,90,0.45)';
+            ctx.fillStyle   = 'rgba(90,90,90,0.10)';
+            ctx.lineWidth = 1;
+
+            const w = 46 * scale;
+            const h = 140 * scale;
+
+            ctx.beginPath();
+            ctx.moveTo(-w * 0.35, 10);
+            ctx.lineTo(-w * 0.5, 35);
+            ctx.lineTo(-w * 0.55, 65);
+            ctx.lineTo(-w * 0.35, 95);
+            ctx.lineTo(-w * 0.2, 120);
+
+            ctx.quadraticCurveTo(0, h, w * 0.2, 120);
+
+            ctx.lineTo(w * 0.35, 95);
+            ctx.lineTo(w * 0.55, 65);
+            ctx.lineTo(w * 0.5, 35);
+            ctx.lineTo(w * 0.35, 10);
+            ctx.closePath();
+
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.rect(-6 * scale, -12 * scale, 12 * scale, 12 * scale);
+            ctx.stroke();
+
+            ctx.setLineDash([4, 6]);
+            ctx.beginPath();
+            ctx.moveTo(0, 10);
+            ctx.lineTo(0, h - 10);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.setLineDash([3, 6]);
+            ctx.beginPath();
+            ctx.moveTo(-w * 0.25, 30);
+            ctx.lineTo(-w * 0.18, 110);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(w * 0.25, 30);
+            ctx.lineTo(w * 0.18, 110);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.beginPath();
+            ctx.moveTo(0, h);
+            ctx.lineTo(0, h + 45);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(-18 * scale, h + 50);
+            ctx.lineTo(18 * scale, h + 50);
+            ctx.stroke();
+
+            drawPinsOnMannequin(w, h, scale);
+
+            ctx.restore();
+        }
+        function drawPinsOnMannequin(w, h, scale) {
+            ctx.strokeStyle = 'rgba(120,120,120,0.6)';
+            ctx.fillStyle   = 'rgba(140,140,140,0.7)';
+            ctx.lineWidth = 1;
+
+            const pins = [
+                { x: -10, y: 28 },
+                { x:  12, y: 40 },
+                { x: -6,  y: 62 },
+                { x:  8,  y: 78 },
+                { x: -12, y: 92 }
+            ];
+
+            pins.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x * scale, p.y * scale, 2, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.moveTo(p.x * scale, p.y * scale);
+                ctx.lineTo(p.x * scale, (p.y + 10) * scale);
+                ctx.stroke();
+            });
+        }
+        function drawMannequinLayer(time) {
+            ctx.save();
+
+            for (let x = 140; x < canvas.width + 200; x += 260) {
+                for (let y = 120; y < canvas.height + 260; y += 320) {
+                    drawFashionMannequin(x, y, 0.8, time);
+                }
+            }
+
+            ctx.restore();
+        }
+
+        function drawBlueBackground() {
+            ctx.fillStyle = '#7fb3ff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        function drawPaperSheet() {
+            const w = canvas.width * 0.6;
+            const h = canvas.height * 0.7;
+            const x = (canvas.width - w) / 2;
+            const y = (canvas.height - h) / 2;
+
+            ctx.fillStyle = 'rgba(0,0,0,0.15)';
+            ctx.fillRect(x + 6, y + 8, w, h);
+
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.moveTo(x + 8, y + 4);
+            ctx.lineTo(x + w - 6, y + 10);
+            ctx.lineTo(x + w - 10, y + h - 6);
+            ctx.lineTo(x + 6, y + h - 10);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.strokeStyle = 'rgba(0,0,0,0.04)';
+            for (let i = 0; i < 20; i++) {
+                ctx.beginPath();
+                ctx.arc(
+                    x + Math.random() * w,
+                    y + Math.random() * h,
+                    Math.random() * 2,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.stroke();
+            }
+
+            return { x, y, w, h };
+        }
+        function drawChildWindow(px, py, pw, ph) {
+            const w = pw * 0.55;
+            const h = ph * 0.5;
+            const x = px + (pw - w) / 2;
+            const y = py + ph * 0.14;
+            const r = w / 2;
+
+            ctx.fillStyle = '#8b5a2b';
+            ctx.beginPath();
+            ctx.moveTo(x, y + h);
+            ctx.lineTo(x, y + r);
+            ctx.arc(x + r, y + r, r, Math.PI, 0);
+            ctx.lineTo(x + w, y + h);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = '#6f451f';
+            ctx.beginPath();
+            ctx.moveTo(x + 10, y + h - 10);
+            ctx.lineTo(x + 10, y + r);
+            ctx.arc(x + r, y + r, r - 10, Math.PI, 0);
+            ctx.lineTo(x + w - 10, y + h - 10);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.strokeStyle = '#5a3a1a';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(x + w / 2, y + 15);
+            ctx.lineTo(x + w / 2, y + h - 15);
+            ctx.moveTo(x + 15, y + h / 2);
+            ctx.lineTo(x + w - 15, y + h / 2);
+            ctx.stroke();
+
+            return { x: x + 15, y: y + 15, w: w - 30, h: h - 30 };
+        }
+        function drawWindowLandscape(win, time) {
+            ctx.save();
+
+            const r = win.w / 2;
+            ctx.beginPath();
+            ctx.moveTo(win.x, win.y + win.h);
+            ctx.lineTo(win.x, win.y + r);
+            ctx.arc(win.x + r, win.y + r, r, Math.PI, 0);
+            ctx.lineTo(win.x + win.w, win.y + win.h);
+            ctx.closePath();
+            ctx.clip();
+
+            ctx.fillStyle = '#87CEEB';
+            ctx.fillRect(win.x, win.y, win.w, win.h);
+
+            ctx.fillStyle = 'rgba(255,255,255,0.9)';
+            for (let i = 0; i < 3; i++) {
+                const cx = win.x + 60 + i * 120 + Math.sin(time*0.0003+i)*10;
+                const cy = win.y + 40 + i * 10;
+
+                ctx.beginPath();
+                ctx.arc(cx, cy, 18, 0, Math.PI*2);
+                ctx.arc(cx+20, cy+5, 15, 0, Math.PI*2);
+                ctx.arc(cx-20, cy+5, 15, 0, Math.PI*2);
+                ctx.fill();
+            }
+
+            const horizon = win.y + win.h * 0.62;
+
+            ctx.fillStyle = '#4CAF50';
+            ctx.fillRect(win.x, horizon, win.w, win.h);
+
+            ctx.strokeStyle = '#3e8e41';
+            ctx.lineWidth = 2;
+            for (let i = 0; i < win.w; i += 10) {
+                ctx.beginPath();
+                ctx.moveTo(win.x + i, horizon);
+                ctx.lineTo(win.x + i, horizon - 10 - Math.random()*6);
+                ctx.stroke();
+            }
+
+            for (let i = 0; i < 3; i++) {
+                const tx = win.x + 40 + i * 120;
+                const ty = horizon;
+
+                ctx.fillStyle = '#8b5a2b';
+                ctx.fillRect(tx - 5, ty - 25, 10, 25);
+
+                ctx.fillStyle = '#2e8b57';
+                ctx.beginPath();
+                ctx.arc(tx, ty - 35, 15, 0, Math.PI*2);
+                ctx.arc(tx-12, ty - 30, 12, 0, Math.PI*2);
+                ctx.arc(tx+12, ty - 30, 12, 0, Math.PI*2);
+                ctx.fill();
+            }
+
+            ctx.restore();
+        }
+
+        function drawChildDoodles(px, py, pw, ph, time) {
+
+            if (!doodlesCache) {
+                doodlesCache = {
+                    rainbows: [],
+                    suns: [],
+                    stars: [],
+                    faces: [],
+                    spirals: []
+                };
+
+                const cols = 4;
+                const rows = 4;
+                const cellW = pw / cols;
+                const cellH = ph / rows;
+
+                let cells = [];
+
+                for (let r = 0; r < rows; r++) {
+                    for (let c = 0; c < cols; c++) {
+                        cells.push({
+                            x: px + c * cellW,
+                            y: py + r * cellH,
+                            w: cellW,
+                            h: cellH
+                        });
+                    }
+                }
+
+                cells.sort(() => Math.random() - 0.5);
+
+                for (let i = 0; i < 2; i++) {
+                    const cell = cells[i];
+                    doodlesCache.rainbows.push({
+                        x: cell.x + cell.w/2,
+                        y: cell.y + cell.h/3,
+                        r: 30
+                    });
+                }
+
+                for (let i = 2; i < 5; i++) {
+                    const cell = cells[i];
+                    doodlesCache.suns.push({
+                        x: cell.x + cell.w/2,
+                        y: cell.y + cell.h/3
+                    });
+                }
+
+                for (let i = 5; i < 10; i++) {
+                    const cell = cells[i];
+                    doodlesCache.stars.push({
+                        x: cell.x + cell.w/2,
+                        y: cell.y + cell.h/2
+                    });
+                }
+
+                for (let i = 10; i < 14; i++) {
+                    const cell = cells[i];
+                    doodlesCache.faces.push({
+                        x: cell.x + cell.w/2,
+                        y: cell.y + cell.h/2
+                    });
+                }
+
+                for (let i = 14; i < 16; i++) {
+                    const cell = cells[i];
+                    doodlesCache.spirals.push({
+                        x: cell.x + cell.w/2,
+                        y: cell.y + cell.h/2
+                    });
+                }
+            }
+            ctx.save();
+            ctx.lineWidth = 2;
+
+            const colors = ['#ff3b3b','#ff9f1c','#ffe066','#7CFF00','#4dabf7','#9b5de5'];
+            doodlesCache.rainbows.forEach(r => {
+                colors.forEach((c,i)=>{
+                    ctx.strokeStyle = c;
+                    ctx.beginPath();
+                    ctx.arc(r.x, r.y, r.r - i*5, Math.PI, 2*Math.PI);
+                    ctx.stroke();
+                });
+            });
+
+            doodlesCache.suns.forEach(s=>{
+                ctx.fillStyle = '#FFD93D';
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, 8, 0, Math.PI*2);
+                ctx.fill();
+
+                ctx.strokeStyle = '#FFD93D';
+                for(let i=0;i<8;i++){
+                    const a = i*(Math.PI/4);
+                    ctx.beginPath();
+                    ctx.moveTo(s.x, s.y);
+                    ctx.lineTo(s.x + Math.cos(a)*14, s.y + Math.sin(a)*14);
+                    ctx.stroke();
+                }
+            });
+
+            ctx.strokeStyle = 'rgba(40,40,40,0.35)';
+            doodlesCache.stars.forEach(st=>{
+                ctx.beginPath();
+                ctx.moveTo(st.x, st.y-5);
+                ctx.lineTo(st.x, st.y+5);
+                ctx.moveTo(st.x-5, st.y);
+                ctx.lineTo(st.x+5, st.y);
+                ctx.stroke();
+            });
+
+            doodlesCache.faces.forEach(f=>{
+                ctx.beginPath();
+                ctx.arc(f.x, f.y, 8, 0, Math.PI*2);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(f.x-3, f.y-2, 1.5, 0, Math.PI*2);
+                ctx.arc(f.x+3, f.y-2, 1.5, 0, Math.PI*2);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(f.x, f.y+2, 4, 0, Math.PI);
+                ctx.stroke();
+            });
+
+            doodlesCache.spirals.forEach(sp=>{
+                ctx.beginPath();
+                for(let a=0;a<Math.PI*2;a+=0.3){
+                    const r = a*2;
+                    ctx.lineTo(
+                        sp.x + Math.cos(a)*r*0.5,
+                        sp.y + Math.sin(a)*r*0.5
+                    );
+                }
+                ctx.stroke();
+            });
+
+            ctx.restore();
+        }
+
+        function drawLevel5Background(time) {
+            drawBlueBackground();
+
+            const paper = drawPaperSheet();
+            const window = drawChildWindow(paper.x, paper.y, paper.w, paper.h);
+
+            drawWindowLandscape(window, time);
+            drawChildDoodles(paper.x, paper.y, paper.w, paper.h, time);
+        }
+
+        function drawBeastFleshBackground(time) {
+            ctx.save();
+
+            const pulse = Math.sin(time * 0.002) * 6;
+
+            ctx.fillStyle = '#1a0f12';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = 'rgba(120,20,20,0.35)';
+            ctx.lineWidth = 2;
+
+            for (let y = 0; y < canvas.height + 80; y += 80) {
+                ctx.beginPath();
+                ctx.moveTo(0, y + pulse);
+
+                for (let x = 0; x <= canvas.width; x += 60) {
+                    ctx.lineTo(
+                        x,
+                        y + Math.sin(time * 0.003 + x * 0.02 + y) * 18
+                    );
+                }
+
+                ctx.stroke();
+            }
+
+            ctx.restore();
+        }
+        function drawBeastCracks(time) {
+            ctx.save();
+
+            ctx.strokeStyle = 'rgba(180,40,40,0.6)';
+            ctx.lineWidth = 1.5;
+
+            for (let i = 0; i < 12; i++) {
+                const cx = (i * 180 + time * 0.03) % canvas.width;
+                const cy = (i * 140) % canvas.height;
+
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+
+                for (let s = 0; s < 6; s++) {
+                    ctx.lineTo(
+                        cx + Math.sin(time * 0.002 + s) * (20 + s * 10),
+                        cy + s * 35
+                    );
+                }
+
+                ctx.stroke();
+            }
+
+            ctx.restore();
+        }
+        function drawBeastEyes(time) {
+            ctx.save();
+
+            const blink = Math.sin(time * 0.004);
+
+            for (let i = 0; i < 7; i++) {
+                const x = (i * 220 + time * 0.08) % canvas.width;
+                const y = 120 + Math.sin(i * 3) * 160;
+
+                const open = Math.max(0, blink);
+
+                ctx.fillStyle = 'rgba(255,60,60,0.85)';
+                ctx.fillRect(x, y, 26, 8 * open);
+
+                ctx.fillStyle = '#000';
+                ctx.fillRect(x + 10, y, 6, 8 * open);
+            }
+
+            ctx.restore();
+        }
+        function drawBeastParallax(time) {
+            ctx.save();
+
+            ctx.globalAlpha = 0.25;
+
+            for (let i = 0; i < 10; i++) {
+                ctx.beginPath();
+                ctx.arc(
+                    (i * 200 + time * 0.12) % canvas.width,
+                    canvas.height / 2,
+                    120 + Math.sin(time * 0.001 + i) * 30,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.strokeStyle = 'rgba(90,10,10,0.5)';
+                ctx.stroke();
+            }
+
+            ctx.restore();
+        }
+        function drawBeastPulse(time) {
+            ctx.save();
+
+            const pulse = Math.sin(time * 0.002) * 0.05 + 1;
+
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.scale(pulse, pulse);
+            ctx.translate(-canvas.width / 2, -canvas.height / 2);
+
+            ctx.fillStyle = 'rgba(255,40,40,0.04)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.restore();
+        }
+        function drawLevel6Background(time) {
+            drawBeastFleshBackground(time);
+            drawBeastParallax(time);
+            drawBeastCracks(time);
+            drawBeastEyes(time);
+            drawBeastPulse(time);
+        }
+
+        function initMemoriesForLevel(level) {
+            memories = [];
+            if (level !== 1) return;
+
+            for (let i = 0; i < 9; i++) {
+                memories.push({
+                    x: Math.random() * (canvas.width - 80),
+                    y: Math.random() * (430 - (-300)) + (-300),
+                    width: 60,
+                    height: 30,
+                    speed: 0.9,
+                    direction: Math.random() < 0.5 ? -1 : 1
+                });
+            }
+        }
+        function updateMemories(delta) {
+            memories.forEach(mem => {
+                mem.x += mem.speed * mem.direction * delta;
+
+                if (mem.x < 0 || mem.x + mem.width > canvas.width) {
+                    mem.direction *= -1;
+                }
+            });
+        }
+        function checkMemoryCollisionWithKevin() {
+            memories.forEach(mem => {
+                const collide =
+                    kevin.x < mem.x + mem.width &&
+                    kevin.x + kevin.width > mem.x &&
+                    kevin.y < mem.y + mem.height &&
+                    kevin.y + kevin.height > mem.y;
+
+                if (collide) {
+                    const pushForce = 0.5;
+                    kevin.velocityX = mem.direction * pushForce;
+                    kevin.isJumpingHorizontally = false;
+                    if (kevin.isOnGround) {
+                        kevin.velocityY = -1.1;
+                    }
+                }
+            });
+        }
+
+        function drawMemories(ctx) {
+            ctx.save();
+            ctx.fillStyle = 'rgba(255,255,255,0.75)';
+
+            memories.forEach(mem => {
+                ctx.fillRect(
+                    mem.x,
+                    mem.y - cameraY,
+                    mem.width,
+                    mem.height
+                );
+            });
+
+            ctx.restore();
+        }
+
+        function initClosingWallsForLevel(level) {
+            closingWalls = [];
+            if (level !== 2) return;
+
+            closingWalls.push({
+                x: 285,
+                yStart: 380,
+                yEnd: 260,
+                width: 24,
+                open: true,
+                timer: 0
+            });
+
+            closingWalls.push({
+                x: 433,
+                yStart: 310,
+                yEnd: 220,
+                width: 24,
+                open: false,
+                timer: Math.PI
+            });
+            closingWalls.push({
+                x: 600,
+                yStart: 380,
+                yEnd: 260,
+                width: 24,
+                open: true,
+                timer: 0
+            });
+            closingWalls.push({
+                x: 730,
+                yStart: 170,
+                yEnd: 50,
+                width: 24,
+                open: true,
+                timer: 0
+            });
+            closingWalls.push({
+                x: 150,
+                yStart: 170,
+                yEnd: 50,
+                width: 24,
+                open: false,
+                timer: Math.PI
+            });
+            closingWalls.push({
+                x: 340,
+                yStart: -20,
+                yEnd: -120,
+                width: 24,
+                open: true,
+                timer: 0
+            });
+            closingWalls.push({
+                x: 530,
+                yStart: -20,
+                yEnd: -120,
+                width: 24,
+                open: false,
+                timer: Math.PI
+            });
+            closingWalls.push({
+                x: 435,
+                yStart: -183,
+                yEnd: -300,
+                width: 21,
+                open: false,
+                timer: Math.PI
+            });
+        }
+        function updateClosingWalls(delta) {
+            closingWalls.forEach(w => {
+                w.timer += 0.02 * delta;
+                w.open = Math.sin(w.timer) > 0.6;
+            });
+        }
+        function checkClosingWallCollision() {
+            closingWalls.forEach(w => {
+                if (w.open) return;
+
+                const wallTop = w.yEnd;
+                const wallBottom = w.yStart;
+
+                const horizontalHit =
+                    kevin.x + kevin.width > w.x &&
+                    kevin.x < w.x + w.width;
+
+                const verticalHit =
+                    kevin.y < wallBottom &&
+                    kevin.y + kevin.height > wallTop;
+
+                if (horizontalHit && verticalHit) {
+                    if (kevin.x < w.x) {
+                        kevin.x = w.x - kevin.width;
+                    } else if (kevin.x > w.x) {
+                        kevin.x = w.x + w.width;
+                    }
+                }
+            });
+        }
+
+        function drawClosingWalls(ctx) {
+            ctx.save();
+            ctx.fillStyle = '#1e1e1e';
+
+            closingWalls.forEach(w => {
+                if (!w.open) {
+                    ctx.fillRect(
+                        w.x,
+                        w.yEnd - cameraY,
+                        w.width,
+                        w.yStart - w.yEnd
+                    );
+                }
+            });
+
+            ctx.restore();
+        }
+
+        function initPunishZonesForLevel(level) {
+            punishZones = [];
+            if (level !== 3) return;
+
+            for (let i = 0; i < 4; i++) {
+                punishZones.push({
+                    x: Math.random() * (canvas.width - 120),
+                    y: Math.random() * (430 - (-300)) + (-300),
+                    radius: 140,
+                    active: true
+                });
+            }
+        }
+        function updatePunishZones(delta) {
+            darknessLevel *= 0.95;
+
+            punishZones.forEach(zone => {
+                const dx = (kevin.x + kevin.width/2) - zone.x;
+                const dy = (kevin.y + kevin.height/2) - zone.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+
+                if (dist < zone.radius) {
+
+                    darknessLevel = Math.min(1, darknessLevel + 0.15);
+
+                    const push = 0.55;
+                    const maxVel = 3.5;
+                    const safeDist = Math.max(dist, 0.001);
+
+                    kevin.velocityX += (dx / safeDist) * push;
+
+                    kevin.velocityX *= 0.9;
+
+                    kevin.velocityX = Math.max(-maxVel, Math.min(maxVel, kevin.velocityX));
+
+                    platforms.forEach(p => {
+                        if (
+                            kevin.x > p.x &&
+                            kevin.x < p.x + p.width
+                        ) {
+                            p.impure = true;
+                            p.impureTimer = 120;
+                        }
+                    });
+                }
+            });
+
+            platforms.forEach(p => {
+                if (p.impure) {
+                    p.impureTimer--;
+                    if (p.impureTimer <= 0) {
+                        p.impure = false;
+                    }
+                }
+            });
+        }
+        function drawPunishDarkness() {
+            if (darknessLevel <= 0.01) return;
+
+            ctx.save();
+            ctx.fillStyle = `rgba(0,0,0,${0.6 * darknessLevel})`;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.restore();
+        }
+
+        function updateLogicPlatforms() {
+            platforms.forEach(p => {
+                if (!p.logic) return;
+
+                p.logicTimer++;
+
+                if (p.logicTimer >= p.logicInterval) {
+                    p.logicTimer = 0;
+                    p.logicState = !p.logicState;
+                }
+            });
+        }
+
+        function kevinOnPlatform(p) {
+            return (
+                kevin.x + kevin.width > p.x &&
+                kevin.x < p.x + p.width &&
+                Math.abs((kevin.y + kevin.height) - p.y) < 12 &&
+                kevin.velocityY >= 0
+            );
+        }
+
+        function updateEnemies(delta) {
+            if (showFinalScreen) return;
+            switch (level) {
+                case 1:
+                    updateMemories(delta);
+                    checkMemoryCollisionWithKevin();
+                    break;
+
+                case 2:
+                    updateClosingWalls(delta);
+                    checkClosingWallCollision();
+                    break;
+                case 3:
+                    updatePunishZones(delta);
+                    break;
+            }
+        }
+
+        function drawEnemies(ctx) {
+            switch (level) {
+                case 1:
+                    drawMemories(ctx);
+                    break;
+
+                case 2:
+                    drawClosingWalls(ctx);
+                    break;
+            }
+        }
+
+        function handleLevelTimer(deltaTime) {
+            if (!gameRunning || storyActive || showFinalScreen) return;
+
+            levelTimer += deltaTime / 60;
+
+            if (levelTimer - lastLifeTick >= LIFE_INTERVAL) {
+                if (lives > 0) {
+                    lives--;
+                    updateUI();
+                    lastLifeTick += LIFE_INTERVAL;
+                }
+            }
+
+            if (levelTimer >= LEVEL_TIME_LIMIT) {
+                if (lives > 0) {
+                    lives = 0;
+                    updateUI();
+                }
+
+                gameOver();
+                return;
+            }
+        }
+
+        function drawBackground() {
+            switch (level) {
+
+                case 1:
+                    drawCorridors();
+                    drawAbstractDoors();
+                    drawBreathingLight();
+                    drawKevinShadow();
+                    break;
+
+                case 2:
+                    drawGridBackground();
+                    drawPanels();
+                    drawMovingLines();
+                    drawScannerLight();
+                    break;
+                case 3:
+                    drawFarLayer(gameTime);
+                    drawMidLayer(gameTime);
+                    drawDoctrineLight(gameTime);
+                    drawDoctrineSymbols(gameTime);
+                    drawNearLayer();
+                    drawMaternalCrosses(gameTime);
+                    break;
+                case 4:
+                    drawMirrorWallBackground(gameTime);
+                    drawFashionPatternLayer(gameTime);
+                    drawMannequinLayer(gameTime);
+                    break;
+                case 5:
+                    drawLevel5Background(gameTime);
+                    break;
+                case 6:
+                    drawLevel6Background(gameTime);
+                    break;
+
+                default:
+                    ctx.fillStyle = '#0f1b2f';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    break;
+            }
+        }
+        function drawFoggyClouds() {
+            ctx.fillStyle = '#bfc5cc';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            for (let i = 0; i < 6; i++) {
+                const y = (i * 180 - cameraY * 0.2) % 900;
+                const x = Math.sin(gameTime * 0.3 + i) * 80;
+
+                ctx.fillStyle = 'rgba(180,180,180,0.25)';
+                ctx.beginPath();
+                ctx.ellipse(
+                    canvas.width / 2 + x,
+                    y,
+                    420,
+                    110,
+                    0,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.fill();
+            }
+        }
+
+        function updateKevin(delta) {
+            if (storyActive || showFinalScreen) return;
+
+            kevin.velocityY += 0.55 * delta;
+
+            const movingLeft = keys['a'] || keys['arrowleft'];
+            const movingRight = keys['d'] || keys['arrowright'];
+            const jumping = (keys[' '] || keys['w'] || keys['arrowup']) && !kevin.isJumping && kevin.isOnGround;
+
+            if (movingLeft && !movingRight) {
+                kevin.velocityX -= kevin.acceleration * delta;
+                kevin.direction = 'left';
+
+                if (kevin.isOnGround) kevin.state = 'walkLeft';
+                kevin.isJumpingHorizontally = true;
+
+            } else if (movingRight && !movingLeft) {
+                kevin.velocityX += kevin.acceleration * delta;
+                kevin.direction = 'right';
+
+                if (kevin.isOnGround) kevin.state = 'walkRight';
+                kevin.isJumpingHorizontally = true;
+
+            } else {
+                kevin.velocityX *= Math.pow(kevin.friction, delta);
+                kevin.isJumpingHorizontally = false;
+
+                if (kevin.isOnGround) kevin.state = 'idle';
+                kevin.walkAnimationTimer = 0;
+                kevin.currentStepFrame = 0;
+            }
+
+            kevin.velocityX = Math.max(
+                -kevin.maxSpeed,
+                Math.min(kevin.velocityX, kevin.maxSpeed)
+            );
+
+            if (jumping) {
+                kevin.velocityY = -kevin.jumpForce;
+                kevin.isJumping = true;
+                kevin.isOnGround = false;
+                kevin.state = 'jump';
+                kevin.jumpAnimationTimer = 0;
+            }
+
+            if (kevin.isJumping) {
+                kevin.state = 'jump';
+            }
+
+            kevin.x += kevin.velocityX;
+            kevin.y += kevin.velocityY;
+
+            if (kevin.x < 0) kevin.x = 0;
+            if (kevin.x + kevin.width > canvas.width) kevin.x = canvas.width - kevin.width;
+
+            kevin.isOnGround = false;
+            let onGoalPlatform = false;
+
+            const minFootSupport = kevin.width * 0.4;
+
+            platforms.forEach(platform => {
+                if (platform.logic && !platform.logicState) return;
+                const platformY = platform.y;
+
+                const overlapLeft = Math.max(kevin.x, platform.x);
+                const overlapRight = Math.min(
+                    kevin.x + kevin.width,
+                    platform.x + platform.width
+                );
+                const overlapWidth = overlapRight - overlapLeft;
+
+                if (
+                    overlapWidth >= minFootSupport &&
+                    kevin.y + kevin.height > platformY &&
+                    kevin.y + kevin.height < platformY + platform.height + 5 &&
+                    kevin.velocityY > 0
+                ) {
+                    kevin.isOnGround = true;
+                    kevin.isJumping = false;
+                    kevin.velocityY = 0;
+                    kevin.y = platformY - kevin.height;
+
+                    if (!platform.visited) {
+                        platform.visited = true;
+                        updateUI();
+                    }
+
+                    if (platform.isGoal) {
+                        onGoalPlatform = true;
+                    }
+                }
+            });
+            if (level === 6) {
+                platforms.forEach(p => {
+                    if (!p.panic) return;
+
+                    if (kevinOnPlatform(p)) {
+                        p.panicTimer++;
+
+                        if (p.panicTimer > 5) {
+                            p.y += 2;
+                        }
+                    } else {
+                        p.panicTimer = 0;
+                    }
+                });
+            }
+
+            if (onGoalPlatform && !levelTransitioning) {
+                levelTransitioning = true;
+
+                setTimeout(() => {
+                    levelComplete();
+                }, 300);
+            }
+        }
+
+        function updateCamera() {
+            const followLine = canvas.height / 2;
+
+            if (kevin.y < followLine) {
+                cameraY = kevin.y - followLine;
+            }
+            if (cameraY < maxCameraY) {
+                cameraY = maxCameraY;
+            }
+        }
+
+        function showLevelIntro(levelNumber) {
+            const name = levelNames[levelNumber] || `NIVEL ${levelNumber}`;
+            levelTitle.textContent = name;
+            levelIntro.style.display = 'flex';
+
+            setTimeout(() => {
+                levelIntro.style.display = 'none';
+            }, 2000);
+        }
+
+        function levelComplete() {
+            if (level === 6) {
+                showFinalScreen = true;
+                finalScreenStartTime = performance.now();
+                return;
+            }
+
+            level++;
+            loadLevel(level);
+            loadKevinImages();
+            startStory();
+            showLevelIntro(level);
+
+            levelTransitioning = false;
+
+            kevin.x = 100;
+            kevin.y = 470;
+            kevin.velocityX = 0;
+            kevin.velocityY = 0;
+            kevin.isJumping = false;
+            kevin.isOnGround = true;
+            kevin.state = 'idle';
+            kevin.isJumpingHorizontally = false;
+            kevin.walkAnimationTimer = 0;
+            kevin.currentStepFrame = 0;
+
+            cameraY = 0;
+            updateUI();
+
+            setTimeout(() => {
+                ctx.fillStyle = 'rgba(248, 150, 30, 0.9)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 50px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('¡NIVEL COMPLETADO!', canvas.width/2, canvas.height/2 - 30);
+                ctx.font = 'bold 35px Arial';
+
+                setTimeout(() => {
+                }, 2000);
+            }, 100);
+        }
+
+        function loseLife() {
+            lives--;
+
+            if (lives <= 0) {
+                gameOver();
+                return;
+            }
+            kevin.x = 100;
+            kevin.y = 470;
+            kevin.velocityX = 0;
+            kevin.velocityY = 0;
+            kevin.isJumping = false;
+            kevin.isOnGround = true;
+            kevin.state = 'idle';
+            kevin.isJumpingHorizontally = false;
+            kevin.walkAnimationTimer = 0;
+            kevin.currentStepFrame = 0;
+
+            cameraY = 0;
+
+            platforms.forEach(p => {
+                if (!p.isGoal) p.visited = false;
+            });
+
+            updateUI();
+        }
+
+        function gameOver() {
+            gameRunning = false;
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#f72585';
+            ctx.font = 'bold 60px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('GAME OVER', canvas.width/2, canvas.height/2 - 60);
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 35px Arial';
+            ctx.fillText(`Nivel: ${level}`, canvas.width/2, canvas.height/2 + 50);
+
+            const btnX = canvas.width/2 - 180;
+            const btnY = canvas.height/2 + 10;
+            const btnW = 360;
+            const btnH = 70;
+
+            ctx.fillStyle = '#4361ee';
+            ctx.fillRect(btnX, btnY, btnW, btnH);
+
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(btnX, btnY, btnW, btnH);
+
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 34px Arial';
+            ctx.fillText('REINICIAR NIVEL', canvas.width/2, btnY + 48);
+
+            gameOverButton = { x: btnX, y: btnY, w: btnW, h: btnH };
+
+            canvas.addEventListener('click', restartGameOnce);
+        }
+
+        function restartGameOnce(e) {
+            if (!gameOverButton) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width  / rect.width;
+            const scaleY = canvas.height / rect.height;
+
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top)  * scaleY;
+
+            const { x: bx, y: by, w: bw, h: bh } = gameOverButton;
+
+            if (x >= bx && x <= bx + bw && y >= by && y <= by + bh) {
+                canvas.removeEventListener('click', restartGameOnce);
+                gameOverButton = null;
+                restartLevel();
+            }
+        }
+
+        function restartLevel() {
+            level = level;
+            gameRunning = true;
+
+            lives = 3;
+            levelTimer = 0;
+            lastLifeTick = 0;
+
+            kevin.x = 100;
+            kevin.y = 470;
+            kevin.velocityX = 0;
+            kevin.velocityY = 0;
+            kevin.isJumping = false;
+            kevin.isOnGround = true;
+            kevin.state = 'idle';
+            kevin.isJumpingHorizontally = false;
+            kevin.walkAnimationTimer = 0;
+            kevin.currentStepFrame = 0;
+
+            cameraY = 0;
+
+            loadLevel(level);
+            loadKevinImages();
+            startStory();
+            showLevelIntro(level);
+            initMemoriesForLevel(level);
+            initClosingWallsForLevel(level);
+            initPunishZonesForLevel(level);
+
+            updateUI();
+
+            lastTime = performance.now();
+            gameLoop();
+        }
+
+        const startScreen = document.getElementById('startScreen');
+        const startButton = document.getElementById('startButton');
+        const startParticles = document.getElementById('startParticles');
+        const ctxParticles = startParticles.getContext('2d');
+
+        startButton.addEventListener('click', () => {
+            if (!imagesLoaded) {
+                alert("Las imágenes todavía se están cargando, espera un momento.");
+                return;
+            }
+            startScreen.style.display = 'none';
+            canvas.style.display = 'block';
+            showLevelIntro(level);
+            startStory();
+
+            gameLoop();
+        });
+
+        const stars = [];
+        for (let i = 0; i < 60; i++) {
+            stars.push({
+                x: Math.random() * startParticles.width,
+                y: Math.random() * startParticles.height,
+                radius: Math.random() * 2 + 1,
+                speed: Math.random() * 0.5 + 0.2
+            });
+        }
+
+        function drawParticles() {
+            ctxParticles.clearRect(0, 0, startParticles.width, startParticles.height);
+            ctxParticles.fillStyle = 'white';
+            stars.forEach(star => {
+                ctxParticles.beginPath();
+                ctxParticles.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+                ctxParticles.fill();
+                star.y += star.speed;
+                if (star.y > startParticles.height) star.y = 0;
+            });
+            requestAnimationFrame(drawParticles);
+        }
+
+        drawParticles();
+
+        const storyBox = document.getElementById('storyBox');
+        const storyText = document.getElementById('storyText');
+        const storyByLevel = {
+            1: [
+                "Kevin… tú no necesitas a los otros.",
+                "Esto es solo ansiedad. Respira.",
+                "Mientras sigas solo, todo está bajo control."
+            ],
+            2: [
+                "La estructura no es crueldad.",
+                "Sin reglas, esto colapsa.",
+                "Dennis mantiene el orden… aunque duela."
+            ],
+            3: [
+                "Patricia solo quiere protegerte.",
+                "El mundo exterior no es seguro.",
+                "Aquí dentro estás… a salvo."
+            ],
+            4: [
+                "Barry no siente… y eso es progreso.",
+                "Las emociones son ruido",
+                "Si no duele, no existe"
+            ],
+            5: [
+                "Hedwig es… especial.",
+                "No entiende el dolor como tú.",
+                "Déjame hablar por él."
+            ],
+            6: [
+                "Esto… no estaba planeado.",
+                "La Bestia no coopera.",
+                "No quiere ser integrada."
+            ]
+        };
+
+        let storyIndex = 0;
+        let storyActive = false;
+
+        if (matchMedia('(hover: none)').matches) {
+            document.getElementById('storyHint').textContent = 'Toca para continuar';
+        }
+
+        function startStory() {
+            storyIndex = 0;
+            storyActive = true;
+
+            const lines = storyByLevel[level];
+
+            if (!lines) {
+                storyActive = false;
+                return;
+            }
+
+            storyBox.style.display = 'block';
+            storyText.textContent = lines[storyIndex];
+        }
+
+        function nextStory() {
+            if (!storyActive) return;
+
+            const lines = storyByLevel[level];
+            storyIndex++;
+
+            if (storyIndex < lines.length) {
+                storyText.textContent = lines[storyIndex];
+            } else {
+                storyBox.style.display = 'none';
+                storyActive = false;
+                levelTimer = 0;
+                lastLifeTick = 0;
+                initMemoriesForLevel(level);
+                initClosingWallsForLevel(level);
+                updateUI();
+            }
+        }
+
+        storyBox.addEventListener('click', nextStory);
+
+        window.addEventListener('keydown', function(e) {
+            if (!storyActive) return;
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                nextStory();
+            }
+        });
+
+        function gameLoop(time = 0) {
+            if (!gameRunning) return;
+
+            if (showFinalScreen) {
+                ctx.fillStyle = 'black';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.fillStyle = 'white';
+                ctx.textAlign = 'center';
+
+                ctx.font = 'bold 42px Arial';
+                ctx.fillText(
+                    'HAS DECIDIDO VIVIR FRAGMENTADO.',
+                    canvas.width / 2,
+                    canvas.height / 2
+                );
+
+                ctx.font = 'italic 20px Arial';
+                ctx.fillText(
+                    'No integrado. No curado. Pero vivo.',
+                    canvas.width / 2,
+                    canvas.height / 2 + 50
+                );
+
+                if (performance.now() - finalScreenStartTime >= 10000) {
+                    showFinalScreen = false;
+                    finalScreenStartTime = null;
+
+                    init();
+                    return;
+                }
+
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+
+            const delta = Math.min((time - lastTime) / 16.666, 1.5);
+            lastTime = time;
+            handleLevelTimer(delta);
+            if (!gameRunning) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            updateKevin(delta);
+            updateEnemies(delta);
+            if (level === 4) updateLogicPlatforms();
+            updateCamera();
+            updateUI();
+
+            if (imagesLoaded) {
+                gameTime += 0.016 * delta;
+            }
+
+            drawBackground();
+            drawPlatforms();
+            drawEnemies(ctx);
+            drawKevin();
+            drawPunishDarkness();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function returnToMainMenu() {
+            gameRunning = false;
+
+            showFinalScreen = false;
+            finalScreenStartTime = null;
+            level = 1;
+
+            storyBox.style.display = 'none';
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            startScreen.style.display = 'flex';
+        }
+
+        (function setupTouchControls() {
+            const map = {
+                btnLeft:  'a',
+                btnRight: 'd',
+                btnJump:  ' '
+            };
+
+            Object.keys(map).forEach(id => {
+                const btn = document.getElementById(id);
+                if (!btn) return;
+                const key = map[id];
+
+                const press = (e) => {
+                    e.preventDefault();
+                    keys[key] = true;
+                    btn.classList.add('pressed');
+                };
+                const release = (e) => {
+                    if (e) e.preventDefault();
+                    keys[key] = false;
+                    btn.classList.remove('pressed');
+                };
+
+                btn.addEventListener('touchstart', press,  { passive: false });
+                btn.addEventListener('touchend',   release, { passive: false });
+                btn.addEventListener('touchcancel',release, { passive: false });
+                btn.addEventListener('mousedown', press);
+                btn.addEventListener('mouseup', release);
+                btn.addEventListener('mouseleave', release);
+            });
+
+            window.addEventListener('blur', () => { keys = {}; });
+        })();
+
+        window.addEventListener('load', init);
