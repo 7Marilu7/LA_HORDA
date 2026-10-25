@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>La horda</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+    <header class="site-banner" aria-label="La Horda">
+        <span class="banner-line" aria-hidden="true"></span>
+        <span class="banner-title">LA HORDA</span>
+        <span class="banner-year">2026</span>
+        <span class="banner-line" aria-hidden="true"></span>
+    </header>
+
+    <div class="controls">
+        <h2>CONTROLES DEL JUEGO</h2>
+        <div class="keys-container">
+            <div class="key-group">
+                <p>MOVIMIENTO HORIZONTAL</p>
+                <div>
+                    <span class="key">A</span>
+                    <span class="key">←</span>
+                    <span style="color:#9d9dff; margin:0 10px;">IZQUIERDA</span>
+                    <span class="key">D</span>
+                    <span class="key">→</span>
+                    <span style="color:#9d9dff; margin-left:10px;">DERECHA</span>
+                </div>
+            </div>
+            <div class="key-group">
+                <p>SALTO</p>
+                <div>
+                    <span class="key">ESPACIO</span>
+                    <span class="key">W</span>
+                    <span class="key">↑</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <section class="game-description">
+        <h2>¿De qué trata La Horda?</h2>
+        <p>
+            Acompaña a Kevin en una aventura inspirada en la película
+            <em>Fragmentado</em>. Supera los desafíos de cada nivel,
+            descubre los obstáculos que te esperan y avanza hasta llegar
+            al final. ¿Podrás completar todos los niveles?
+        </p>
+    </section>
+
+    <div id="gameWrapper" class="game-container">
+
+        <div class="hud">
+            <div>
+                NIVEL: <span id="hudLevel">1</span>
+            </div>
+            <div>
+                TIEMPO: <span id="hudScore">60</span>
+            </div>
+            <div>
+                VIDAS: <span id="hudLives">3</span>
+            </div>
+        </div>
+
+        <div id="startScreen">
+
+            <div id="startBackground" style="
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: url('img/fondo_inicio.png') center/cover no-repeat;
+                z-index: 0;
+            "></div>
+
+            <canvas id="startParticles" width="900" height="550" style="
+                position: absolute;
+                top: 0;
+                left: 0;
+                z-index: 0;
+                pointer-events: none;
+            "></canvas>
+
+            <div style="
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                z-index: 1;
+                text-align: center;
+                color: #fff;
+            ">
+<button id="startButton" style="
+                    margin-top: 0;
+                    padding: 15px 50px;
+                    font-size: 1.8rem;
+                    font-weight: bold;
+                    color: white;
+                    background-color: #4cc9f0;
+                    border: none;
+                    border-radius: 15px;
+                    cursor: pointer;
+                    box-shadow: 0 0 20px #4cc9f0;
+                    animation: glowButton 1.5s infinite alternate;
+                ">INICIAR</button>
+            </div>
+        </div>
+
+        <canvas id="gameCanvas" width="900" height="550"></canvas>
+
+        <div id="storyBox">
+            <div id="storyText"></div>
+            <div id="storyHint">Click o enter para continuar</div>
+        </div>
+
+        <div id="levelIntro">
+            <h2 id="levelTitle">KEVIN HOUSE'S</h2>
+        </div>
+
+    </div>
+
+    <div id="touchControls" aria-label="Controles táctiles del juego">
+        <button id="btnLeft" class="touch-btn" aria-label="Izquierda">◀</button>
+        <button id="btnRight" class="touch-btn" aria-label="Derecha">▶</button>
+        <button id="btnJump" class="touch-btn" aria-label="Saltar">SALTO</button>
+    </div>
+
+    <section class="characters-section">
+        <h2>PERSONAJES</h2>
+        <p class="characters-intro">
+            Conoce las personalidades que encontrarás a lo largo de los seis niveles.
+        </p>
+
+        <div class="characters-grid">
+
+            <article class="character-card">
+                <img src="img/level1/kevin_frente.png"
+                     alt="Kevin" loading="lazy">
+                <h3>KEVIN</h3>
+                <p>El protagonista de esta aventura, cuyo camino te llevará a enfrentar cada nivel.</p>
+            </article>
+
+            <article class="character-card">
+                <img src="img/level2/kevin_frente.png"
+                     alt="Dennis" loading="lazy">
+                <h3>DENNIS</h3>
+                <p>Una personalidad estricta y dominante que representa uno de los desafíos del recorrido.</p>
+            </article>
+
+            <article class="character-card">
+                <img src="img/level3/kevin_frente.png"
+                     alt="Patricia" loading="lazy">
+                <h3>PATRICIA</h3>
+                <p>Una personalidad firme y autoritaria dentro de la historia.</p>
+            </article>
+
+            <article class="character-card">
+                <img src="img/level4/kevin_frente.png"
+                     alt="Barry" loading="lazy">
+                <h3>BARRY</h3>
+                <p>Una personalidad creativa que forma parte de las distintas identidades de Kevin.</p>
+            </article>
+
+            <article class="character-card">
+                <img src="img/level5/kevin_frente.png"
+                     alt="Hedwig" loading="lazy">
+                <h3>HEDWIG</h3>
+                <p>Una personalidad infantil que aporta un contraste particular a la historia.</p>
+            </article>
+
+            <article class="character-card">
+                <img src="img/level6/kevin_frente.png"
+                     alt="La Bestia" loading="lazy">
+                <h3>LA BESTIA</h3>
+                <p>La personalidad más temida, que representa el desafío final de esta aventura.</p>
+            </article>
+
+        </div>
+    </section>
+
+    <div class="animation-info" style="display:none;">
+        Estado actual de Kevin: <span id="kevinState">CARGANDO...</span>
+    </div>
+
+    <script src="js/game.js"></script>
+    <footer class="site-footer" aria-label="Pie de página">
+        <span class="footer-line" aria-hidden="true"></span>
+        <span>2026</span>
+        <span class="footer-line" aria-hidden="true"></span>
+    </footer>
+</body>
+</html>
