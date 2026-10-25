@@ -539,12 +539,12 @@
         .instructions,
         .game-description,
         .characters-section {
-            width: min(100%, 900px);
+            width: min(100%, 940px);
             min-width: 0;
         }
 
         #gameWrapper.game-container {
-            width: min(100%, 900px);
+            width: min(100%, 940px);
             height: auto;
             aspect-ratio: 900 / 550;
             flex: 0 0 auto;
@@ -817,9 +817,126 @@
                 transition-duration: 0.01ms !important;
             }
         }
+
+
+        /* ===== AJUSTES SOLICITADOS: BANNER, TAMAÑO Y CONTROLES MÓVILES ===== */
+        .site-banner,
+        .site-footer {
+            width: min(100%, 940px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: clamp(10px, 2.5vw, 24px);
+            color: #4cc9f0;
+            text-align: center;
+            text-shadow: 0 0 12px rgba(76, 201, 240, 0.55);
+            letter-spacing: clamp(2px, 0.6vw, 5px);
+        }
+
+        .site-banner {
+            margin: 0 auto 8px;
+            padding: 10px 12px;
+            border-top: 1px solid rgba(76, 201, 240, 0.6);
+            border-bottom: 1px solid rgba(76, 201, 240, 0.6);
+            background: linear-gradient(90deg, transparent, rgba(76, 201, 240, 0.10), transparent);
+            font-weight: 800;
+        }
+
+        .banner-title {
+            font-size: clamp(1rem, 3.2vw, 1.6rem);
+        }
+
+        .banner-year {
+            color: #f72585;
+            font-size: clamp(0.8rem, 2.4vw, 1.05rem);
+            letter-spacing: 2px;
+        }
+
+        .banner-line,
+        .footer-line {
+            display: block;
+            width: clamp(18px, 8vw, 90px);
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #4cc9f0);
+            box-shadow: 0 0 8px rgba(76, 201, 240, 0.5);
+        }
+
+        .banner-line:last-child,
+        .footer-line:last-child {
+            transform: scaleX(-1);
+        }
+
+        .site-footer {
+            margin: 22px auto 0;
+            padding: 12px 10px max(12px, env(safe-area-inset-bottom));
+            border-top: 1px solid rgba(76, 201, 240, 0.45);
+            color: #f72585;
+            font-weight: 800;
+            font-size: 0.95rem;
+            letter-spacing: 4px;
+        }
+
+        /* En móviles, la barra táctil ocupa su propio espacio justo bajo el juego. */
+        #touchControls {
+            display: none;
+        }
+
+        @media (hover: none) and (pointer: coarse) {
+            #touchControls {
+                display: flex;
+                position: relative;
+                inset: auto;
+                z-index: 30;
+                width: min(100%, 940px);
+                min-height: 76px;
+                margin: -5px auto 8px;
+                padding: 8px 12px;
+                align-items: center;
+                justify-content: center;
+                gap: clamp(14px, 7vw, 34px);
+                border: 1px solid rgba(76, 201, 240, 0.4);
+                border-radius: 14px;
+                background: linear-gradient(135deg, rgba(15, 52, 96, 0.96), rgba(22, 33, 62, 0.96));
+                box-shadow: 0 0 18px rgba(76, 201, 240, 0.18), inset 0 0 14px rgba(76, 201, 240, 0.06);
+                pointer-events: auto;
+            }
+
+            #touchControls .touch-btn {
+                position: static;
+                flex: 0 0 auto;
+                bottom: auto;
+                left: auto;
+                right: auto;
+                width: clamp(46px, 13vw, 58px);
+                height: clamp(46px, 13vw, 58px);
+                margin: 0;
+                font-size: 1.15rem;
+                box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
+            }
+
+            #touchControls #btnJump {
+                width: clamp(58px, 16vw, 70px);
+                height: clamp(58px, 16vw, 70px);
+                font-size: 0.72rem;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .site-banner { margin-bottom: 5px; padding: 8px 6px; }
+            #gameWrapper.game-container { margin-bottom: 8px; }
+            .site-footer { margin-top: 16px; }
+        }
+
     </style>
 </head>
 <body>
+
+    <header class="site-banner" aria-label="La Horda">
+        <span class="banner-line" aria-hidden="true"></span>
+        <span class="banner-title">LA HORDA</span>
+        <span class="banner-year">2026</span>
+        <span class="banner-line" aria-hidden="true"></span>
+    </header>
 
     <div class="controls">
         <h2>CONTROLES DEL JUEGO</h2>
@@ -924,12 +1041,6 @@
 
         <canvas id="gameCanvas" width="900" height="550"></canvas>
 
-        <div id="touchControls">
-            <button id="btnLeft"  class="touch-btn" aria-label="Izquierda">◀</button>
-            <button id="btnRight" class="touch-btn" aria-label="Derecha">▶</button>
-            <button id="btnJump"  class="touch-btn" aria-label="Saltar">SALTO</button>
-        </div>
-
         <div id="storyBox">
             <div id="storyText"></div>
             <div id="storyHint">Click o enter para continuar</div>
@@ -939,6 +1050,12 @@
             <h2 id="levelTitle">KEVIN HOUSE'S</h2>
         </div>
 
+    </div>
+
+    <div id="touchControls" aria-label="Controles táctiles del juego">
+        <button id="btnLeft" class="touch-btn" aria-label="Izquierda">◀</button>
+        <button id="btnRight" class="touch-btn" aria-label="Derecha">▶</button>
+        <button id="btnJump" class="touch-btn" aria-label="Saltar">SALTO</button>
     </div>
 
     <section class="characters-section">
@@ -3499,5 +3616,10 @@
 
         window.addEventListener('load', init);
     </script>
+    <footer class="site-footer" aria-label="Pie de página">
+        <span class="footer-line" aria-hidden="true"></span>
+        <span>2026</span>
+        <span class="footer-line" aria-hidden="true"></span>
+    </footer>
 </body>
 </html>
