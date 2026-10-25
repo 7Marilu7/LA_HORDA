@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>La horda</title>
     <style>
         * {
@@ -514,6 +514,308 @@
                 font-size: 0.75rem;
             }
             #btnRight { left: 68px; }
+        }
+
+        /* ===== AJUSTES FINALES DE RESPONSIVIDAD Y ACCESIBILIDAD ===== */
+        html {
+            min-width: 0;
+            scroll-behavior: smooth;
+            -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
+        }
+
+        body {
+            width: 100%;
+            min-width: 0;
+            min-height: 100vh;
+            min-height: 100dvh;
+            padding-left: max(12px, env(safe-area-inset-left));
+            padding-right: max(12px, env(safe-area-inset-right));
+            gap: 0;
+        }
+
+        .controls,
+        .status,
+        .instructions,
+        .game-description,
+        .characters-section {
+            width: min(100%, 900px);
+            min-width: 0;
+        }
+
+        #gameWrapper.game-container {
+            width: min(100%, 900px);
+            height: auto;
+            aspect-ratio: 900 / 550;
+            flex: 0 0 auto;
+            margin: 18px auto;
+            isolation: isolate;
+        }
+
+        #gameCanvas {
+            width: 100%;
+            height: 100%;
+            object-fit: fill;
+        }
+
+        #startScreen {
+            position: absolute;
+            inset: 0;
+            overflow: hidden;
+        }
+
+        #startScreen > div:last-child {
+            width: min(94%, 650px);
+        }
+
+        #startTitle {
+            font-size: clamp(2rem, 8vw, 5rem) !important;
+            line-height: 1.05;
+            margin-top: 0 !important;
+            overflow-wrap: anywhere;
+        }
+
+        #startButton {
+            max-width: 100%;
+            padding: 0.7em 1.5em !important;
+            font-size: clamp(1rem, 4vw, 1.8rem) !important;
+            touch-action: manipulation;
+        }
+
+        .hud {
+            gap: 8px;
+            min-width: 0;
+            font-size: clamp(0.62rem, 1.8vw, 0.95rem);
+        }
+
+        .hud > div {
+            min-width: 0;
+            white-space: nowrap;
+        }
+
+        #storyBox {
+            max-height: 58%;
+            overflow-y: auto;
+            overflow-wrap: anywhere;
+            padding: clamp(8px, 2vw, 16px) clamp(10px, 2.4vw, 20px);
+        }
+
+        #storyText {
+            font-size: clamp(0.78rem, 2.5vw, 1.15rem);
+        }
+
+        #storyHint {
+            font-size: clamp(0.65rem, 1.8vw, 0.8rem);
+        }
+
+        #levelIntro {
+            padding: 12px;
+        }
+
+        #levelTitle {
+            max-width: 100%;
+            text-align: center;
+            overflow-wrap: anywhere;
+            font-size: clamp(1.25rem, 7vw, 4rem);
+            letter-spacing: clamp(1px, 0.5vw, 3px);
+        }
+
+        .keys-container {
+            flex-wrap: wrap;
+            align-items: flex-start;
+            row-gap: 18px;
+        }
+
+        .key-group > div {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .key {
+            margin: 0;
+        }
+
+        .game-description p,
+        .character-card p,
+        .characters-intro {
+            overflow-wrap: anywhere;
+        }
+
+        .character-card img {
+            max-width: 100%;
+        }
+
+        .touch-btn {
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
+        }
+
+        button {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding-top: 12px;
+                padding-bottom: max(18px, env(safe-area-inset-bottom));
+            }
+
+            h1 {
+                font-size: clamp(1.7rem, 8vw, 2.5rem);
+                letter-spacing: 1px;
+            }
+
+            .controls,
+            .game-description,
+            .characters-section {
+                padding: 15px;
+                border-radius: 12px;
+            }
+
+            .controls {
+                margin-top: 8px;
+            }
+
+            .controls h2,
+            .instructions h2,
+            .characters-section h2 {
+                font-size: 1.25rem;
+            }
+
+            .keys-container {
+                flex-direction: column;
+                align-items: center;
+                gap: 16px;
+            }
+
+            .key-group {
+                width: 100%;
+            }
+
+            .key-group p {
+                font-size: 0.85rem;
+            }
+
+            .key {
+                padding: 8px 10px;
+                min-width: 38px;
+                font-size: 0.95rem;
+            }
+
+            .game-description {
+                margin: 12px auto 16px;
+            }
+
+            .game-description h2 {
+                font-size: 1.2rem;
+            }
+
+            .game-description p {
+                font-size: 0.92rem;
+                line-height: 1.55;
+            }
+
+            #gameWrapper.game-container {
+                width: 100%;
+                margin: 8px auto 16px;
+                border-width: 2px;
+                border-radius: 10px;
+                box-shadow: 0 0 18px rgba(76, 201, 240, 0.28);
+            }
+
+            .hud {
+                top: 5px;
+                left: 5px;
+                right: 5px;
+                height: 28px;
+                padding: 2px 6px;
+                gap: 4px;
+                border-radius: 6px;
+                font-size: clamp(0.56rem, 2.3vw, 0.72rem);
+            }
+
+            .touch-btn {
+                bottom: 8px;
+                width: clamp(38px, 11vw, 46px);
+                height: clamp(38px, 11vw, 46px);
+                font-size: 1rem;
+            }
+
+            #btnLeft { left: 8px; }
+            #btnRight { left: 54px; }
+
+            #btnJump {
+                right: 8px;
+                bottom: 8px;
+                width: clamp(46px, 13vw, 56px);
+                height: clamp(46px, 13vw, 56px);
+                font-size: 0.68rem;
+            }
+
+            #storyBox {
+                left: 5px;
+                right: 5px;
+                bottom: 5px;
+                max-height: 62%;
+                border-width: 1px;
+                border-radius: 9px;
+            }
+
+            .characters-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 10px;
+            }
+
+            .character-card {
+                padding: 9px;
+            }
+
+            .character-card img {
+                height: 120px;
+            }
+
+            .character-card p {
+                font-size: 0.82rem;
+            }
+
+            .instructions {
+                padding: 15px;
+            }
+        }
+
+        @media (max-width: 360px) {
+            body { padding-left: 7px; padding-right: 7px; }
+
+            .characters-grid { grid-template-columns: 1fr; }
+
+            .hud { font-size: 0.55rem; }
+
+            #btnRight { left: 50px; }
+
+            #storyText { font-size: 0.76rem; }
+        }
+
+        @media (max-height: 500px) and (orientation: landscape) {
+            #gameWrapper.game-container {
+                width: min(100%, calc((100dvh - 24px) * 900 / 550));
+                margin-top: 6px;
+                margin-bottom: 6px;
+            }
+
+            .touch-btn { bottom: 6px; }
+            #btnJump { bottom: 6px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            html { scroll-behavior: auto; }
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                scroll-behavior: auto !important;
+                transition-duration: 0.01ms !important;
+            }
         }
     </style>
 </head>
