@@ -919,16 +919,12 @@
             #gameWrapper.game-container { margin-bottom: 8px; }
             .site-footer { margin-top: 16px; }
         }
-
-
-/* ===== AJUSTE FINAL: BOTÓN DE INICIO Y VISTA MÓVIL MÁS COMPACTA ===== */
 #startButton {
     position: relative;
     top: 18px;
 }
 
 @media (max-width: 600px) {
-    /* Reduce un poco el área de juego para que también se vean los controles. */
     #gameWrapper.game-container {
         width: min(90vw, 480px);
         margin: 6px auto 5px;
@@ -991,5 +987,102 @@
     #touchControls #btnJump {
         width: 44px;
         height: 44px;
+    }
+}
+#startScreen > div:last-child {
+    top: 42% !important;   /* antes 50% */
+}
+
+#startButton {
+    position: relative;
+    top: clamp(20px, 6vh, 42px);  /* baja según altura de pantalla, con límite */
+}
+
+@media (max-width: 600px) {
+    #startScreen > div:last-child {
+        top: 40% !important;  /* un poco más arriba en móvil para no salirse */
+    }
+    #startButton {
+        top: clamp(14px, 5vh, 30px);
+        padding: 0.6em 1.2em !important;
+        font-size: clamp(0.9rem, 3.8vw, 1.25rem) !important;
+    }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+    #startScreen > div:last-child {
+        top: 38% !important;
+    }
+    #startButton {
+        top: clamp(8px, 3vh, 18px);
+    }
+}
+@media (hover: none) and (pointer: coarse) {
+    #touchControls {
+        display: flex;
+        position: relative;
+        inset: auto;
+        z-index: 30;
+        width: min(94vw, 940px);          /* se adapta al ancho real */
+        min-height: clamp(64px, 11vh, 90px);
+        margin: -4px auto 8px;
+        padding: clamp(6px, 1.5vw, 12px) clamp(8px, 2vw, 16px);
+        align-items: center;
+        justify-content: center;
+        flex-wrap: wrap;                   /* permite reacomodo si no cabe */
+        gap: clamp(10px, 6vw, 34px);
+        border: 1px solid rgba(76, 201, 240, 0.4);
+        border-radius: clamp(10px, 2.5vw, 16px);
+        background: linear-gradient(135deg, rgba(15, 52, 96, 0.96), rgba(22, 33, 62, 0.96));
+        box-shadow: 0 0 18px rgba(76, 201, 240, 0.18), inset 0 0 14px rgba(76, 201, 240, 0.06);
+        pointer-events: auto;
+    }
+
+    #touchControls .touch-btn {
+        position: static;
+        flex: 0 0 auto;
+        bottom: auto; left: auto; right: auto;
+        width: clamp(44px, 12vw, 62px);
+        height: clamp(44px, 12vw, 62px);
+        margin: 0;
+        font-size: clamp(0.9rem, 3.5vw, 1.2rem);
+        box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
+        touch-action: manipulation;
+    }
+
+    #touchControls #btnJump {
+        width: clamp(56px, 15vw, 74px);
+        height: clamp(56px, 15vw, 74px);
+        font-size: clamp(0.6rem, 2.6vw, 0.8rem);
+    }
+}
+@media (hover: none) and (pointer: coarse) and (max-width: 360px) {
+    #touchControls {
+        width: 96vw;
+        gap: clamp(6px, 3vw, 12px);
+        padding: 4px 6px;
+    }
+    #touchControls .touch-btn {
+        width: clamp(40px, 12vw, 48px);
+        height: clamp(40px, 12vw, 48px);
+    }
+    #touchControls #btnJump {
+        width: clamp(48px, 14vw, 58px);
+        height: clamp(48px, 14vw, 58px);
+    }
+}
+@media (hover: none) and (pointer: coarse) and (max-height: 500px) and (orientation: landscape) {
+    #touchControls {
+        min-height: 52px;
+        padding: 3px 8px;
+        gap: clamp(8px, 4vw, 20px);
+    }
+    #touchControls .touch-btn {
+        width: 40px;
+        height: 40px;
+    }
+    #touchControls #btnJump {
+        width: 46px;
+        height: 46px;
     }
 }
