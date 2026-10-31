@@ -69,7 +69,7 @@ También puedes utilizar la extensión **Live Server** de Visual Studio Code par
 
 ## Estado del proyecto
 
-Proyecto desarrollado como parte de un portafolio personal.
+Proyecto desarrollado como práctica de diseño y desarrollo web.
 
 ## Autoría
 
